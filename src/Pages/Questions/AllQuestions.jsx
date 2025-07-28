@@ -530,7 +530,7 @@ const AllQuestions = () => {
             />
 
             <Dialog open={!!previewModalData} onOpenChange={() => setPreviewModalData(null)}>
-                <DialogContent>
+                <DialogContent className="sm:max-w-2xl sm:max-h-[80vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle className="text-brand-primary">Question Preview</DialogTitle>
                         <DialogDescription className="pt-2 text-lg text-gray-800">{previewModalData?.question}</DialogDescription>

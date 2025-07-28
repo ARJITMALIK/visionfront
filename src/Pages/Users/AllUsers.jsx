@@ -173,14 +173,14 @@ const Modal = ({ isOpen, onClose, title, children }) => {
     ); 
 };
 
-const UserForm = ({ initialUser, onSubmit, onClose, isLoading, allUsers }) => { 
-    const [formData, setFormData] = useState({ ...initialUser, parent: initialUser.parent || null }); 
+const UserForm = ({ initialUser, onSubmit, onClose, isLoading, allUsers, elections }) => { 
+    const [formData, setFormData] = useState({ ...initialUser, parent: initialUser.parent || null, election_id: initialUser.election_id || '' }); 
     
     useEffect(() => { 
         if (formData.role === 'QC') { 
             setFormData(prev => ({ ...prev, parent: 0 })); 
         } else if (initialUser.role !== formData.role) { 
-            setFormData(prev => ({ ...prev, parent: '' })); 
+            setFormData(prev => ({ ...prev, parent: '', election_id: '' })); 
         } 
     }, [formData.role, initialUser.role]); 
     
@@ -245,6 +245,27 @@ const UserForm = ({ initialUser, onSubmit, onClose, isLoading, allUsers }) => {
                     <option value="OT">OT</option>
                 </select>
             </div>
+
+            {/* Election dropdown - only show for QC role */}
+            {formData.role === 'QC' && (
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Election</label>
+                    <select 
+                        name="election_id" 
+                        value={formData.election_id || ''} 
+                        onChange={handleChange} 
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+                        required
+                    >
+                        <option value="">Select Election</option>
+                        {elections.map(election => (
+                            <option key={election.election_id} value={election.election_id}>
+                                {election.election_name}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            )}
             
             <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Parent Name</label>
@@ -330,6 +351,7 @@ const UserForm = ({ initialUser, onSubmit, onClose, isLoading, allUsers }) => {
 // ===================================================================================
 const AllUsers = () => {
     const [users, setUsers] = useState([]);
+    const [elections, setElections] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
     const [selectedUserIds, setSelectedUserIds] = useState([]);
@@ -339,14 +361,29 @@ const AllUsers = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState('all');
     const [filterRole, setFilterRole] = useState('all');
+    const [filterElection, setFilterElection] = useState('all'); // New election filter state
     
     const ITEMS_PER_PAGE = 10;
     
-    const fetchUsers = useCallback(async () => {
+    const fetchUsers = useCallback(async (electionId = null) => {
         setIsLoading(true);
         setError(null);
         try {
-            const response = await VisionBase.get('/users');
+            let url = '/users';
+            const params = {};
+            
+            // Add election_id as parameter if selected and not 'all'
+            if (electionId && electionId !== 'all') {
+                params.election_id = electionId;
+            }
+            
+            // Build URL with parameters
+            if (Object.keys(params).length > 0) {
+                const searchParams = new URLSearchParams(params);
+                url += `?${searchParams.toString()}`;
+            }
+            
+            const response = await VisionBase.get(url);
             const transformed = transformUserData(response.data.data.rows);
             setUsers(transformed);
         } catch (err) {
@@ -357,9 +394,25 @@ const AllUsers = () => {
         }
     }, []);
 
+    const fetchElections = useCallback(async () => {
+        try {
+            const response = await VisionBase.get('/elections');
+            setElections(response.data.data.rows || []);
+        } catch (err) {
+            console.error("Failed to fetch elections:", err);
+            setElections([]);
+        }
+    }, []);
+
     useEffect(() => {
-        fetchUsers();
-    }, [fetchUsers]);
+        fetchElections();
+    }, [fetchElections]);
+
+    // Fetch users when election filter changes
+    useEffect(() => {
+        fetchUsers(filterElection);
+        setCurrentPage(1); // Reset to first page when filter changes
+    }, [fetchUsers, filterElection]);
 
     const filteredUsers = useMemo(() => users.filter(user => 
         (user?.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -383,7 +436,7 @@ const AllUsers = () => {
     const totalPages = Math.ceil(filteredUsers.length / ITEMS_PER_PAGE);
 
     const closeModal = () => setModalState({ type: null, user: null });
-    const handleAdd = () => setModalState({ type: 'add', user: { name: '', parent: null, role: '', mobile: '', status: 'Active', image: '' } });
+    const handleAdd = () => setModalState({ type: 'add', user: { name: '', parent: null, role: '', mobile: '', status: 'Active', image: '', election_id: '' } });
     const handleEdit = (user) => setModalState({ type: 'edit', user });
     const handleDelete = (user) => setModalState({ type: 'delete', user });
     const handleBulkDelete = () => setModalState({ type: 'bulk-delete' });
@@ -437,6 +490,19 @@ const AllUsers = () => {
                     changes.parent = newParentId;
                 }
 
+                // Handle election_id for QC users
+                if (formData.role === 'QC' && formData.election_id !== originalUser.election_id) {
+                    changes.election_id = parseInt(formData.election_id, 10);
+                }
+
+                // Handle election_id inheritance for ZC and OT users
+                if ((formData.role === 'ZC' || formData.role === 'OT') && formData.parent) {
+                    const parentUser = users.find(u => u.user_id === parseInt(formData.parent, 10));
+                    if (parentUser && parentUser.election_id && parentUser.election_id !== originalUser.election_id) {
+                        changes.election_id = parentUser.election_id;
+                    }
+                }
+
                 if (changes.name || changes.mobile) {
                     changes.password = generatePassword(formData.name, formData.mobile);
                 }
@@ -450,6 +516,7 @@ const AllUsers = () => {
                 await VisionBase.put(`/user/${formData.user_id}`, changes);
 
             } else {
+                // Adding new user
                 let parentValue;
                 if (formData.role === 'QC') {
                     parentValue = 0;
@@ -465,10 +532,24 @@ const AllUsers = () => {
                     profile: formData.image || null,
                     password: generatePassword(formData.name, formData.mobile)
                 };
+
+                // Add election_id for QC users
+                if (formData.role === 'QC' && formData.election_id) {
+                    payload.election_id = parseInt(formData.election_id, 10);
+                }
+
+                // Add election_id for ZC and OT users (inherit from parent)
+                if ((formData.role === 'ZC' || formData.role === 'OT') && formData.parent) {
+                    const parentUser = users.find(u => u.user_id === parseInt(formData.parent, 10));
+                    if (parentUser && parentUser.election_id) {
+                        payload.election_id = parentUser.election_id;
+                    }
+                }
+
                 await VisionBase.post('/add-user', payload);
             }
 
-            await fetchUsers();
+            await fetchUsers(filterElection); // Refresh with current election filter
             closeModal();
 
         } catch (err) {
@@ -483,7 +564,7 @@ const AllUsers = () => {
         setIsSubmitting(true);
         try {
             await VisionBase.delete(`/user/${userId}`);
-            await fetchUsers();
+            await fetchUsers(filterElection); // Refresh with current election filter
             closeModal();
         } catch (err) {
             console.error("Failed to delete user:", err);
@@ -497,7 +578,7 @@ const AllUsers = () => {
         setIsSubmitting(true);
         try {
             await VisionBase.delete('/users', { data: { ids: selectedUserIds } });
-            await fetchUsers();
+            await fetchUsers(filterElection); // Refresh with current election filter
             setSelectedUserIds([]);
             closeModal();
         } catch (err) {
@@ -574,7 +655,7 @@ const AllUsers = () => {
                                     All Users <span className="text-gray-500 font-normal">({filteredUsers.length})</span>
                                 </h2>
                             )}
-                            <div className="flex items-center space-x-4">
+                            <div className="flex items-center space-x-4 flex-wrap">
                                 <div className="relative">
                                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                                     <input 
@@ -585,6 +666,21 @@ const AllUsers = () => {
                                         className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white/80 backdrop-blur-sm" 
                                     />
                                 </div>
+                                
+                                {/* Election Filter Dropdown */}
+                                <select 
+                                    value={filterElection} 
+                                    onChange={(e) => setFilterElection(e.target.value)} 
+                                    className="px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white/80 backdrop-blur-sm"
+                                >
+                                    <option value="all">All Elections</option>
+                                    {elections.map(election => (
+                                        <option key={election.election_id} value={election.election_id}>
+                                            {election.election_name}
+                                        </option>
+                                    ))}
+                                </select>
+                                
                                 <select 
                                     value={filterRole} 
                                     onChange={(e) => setFilterRole(e.target.value)} 
@@ -709,6 +805,7 @@ const AllUsers = () => {
                             onClose={closeModal} 
                             isLoading={isSubmitting} 
                             allUsers={users}
+                            elections={elections}
                         />
                     )}
                 </Modal>

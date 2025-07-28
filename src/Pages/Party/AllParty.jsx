@@ -144,7 +144,7 @@ const AllParty = () => {
             setIsDeleting(true);
             
             // Uncomment when VisionBase is available
-            await VisionBase.delete(`/parties/${modalData.delete.party_id}`);
+            await VisionBase.delete(`/party/${modalData.delete.party_id}`);
             
             // Simulate API call
             

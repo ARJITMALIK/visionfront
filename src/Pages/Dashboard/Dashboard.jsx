@@ -6,6 +6,7 @@ import {
   Eye, Calendar, Navigation, Signal, Battery, Wifi, Camera, Shield
 } from 'lucide-react';
 import LiveTracking from './LiveTracking';
+import LiveMap from './LiveMap';
 
 // ===================================================================================
 // DUMMY API HANDLER
@@ -471,6 +472,13 @@ const Dashboard = () => {
             >
               Live Team Tracking
             </TabButton>
+            <TabButton 
+              active={activeTab === 'livemap'} 
+              onClick={() => setActiveTab('livemap')}
+              icon={MapPin}
+            >
+              Live Survey
+            </TabButton>
           </div>
         </div>
       </div>
@@ -479,6 +487,7 @@ const Dashboard = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {activeTab === 'surveys' && <SurveyDashboard />}
         {activeTab === 'tracking' && <LiveTracking />}
+        {activeTab === 'livemap' && <LiveMap />}
       </div>
 
       {/* Footer */}

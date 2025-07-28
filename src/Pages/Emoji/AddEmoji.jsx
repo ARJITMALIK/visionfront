@@ -6,16 +6,6 @@ import { VisionBase } from '@/utils/axiosInstance';
 // Import the new VisionBase API service
 
 // ===================================================================================
-// UTILITY FUNCTION
-// ===================================================================================
-const fileToBase64 = (file) => new Promise((resolve, reject) => {
-  const reader = new FileReader();
-  reader.readAsDataURL(file);
-  reader.onload = () => resolve(reader.result);
-  reader.onerror = (error) => reject(error);
-});
-
-// ===================================================================================
 // MODERN UI COMPONENTS (Unchanged)
 // ===================================================================================
 const Card = ({ children, className = "" }) => (
@@ -109,6 +99,7 @@ const AddEmoji = () => {
   const [emojiImage, setEmojiImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState('');
 
   const handleImageChange = (file) => {
     if (file && file.type.startsWith('image/')) {
@@ -121,7 +112,13 @@ const AddEmoji = () => {
   };
 
   const handleRemoveImage = () => { setEmojiImage(null); setImagePreview(null); };
-  const handleReset = () => { setTitle(''); setEmojiImage(null); setImagePreview(null); alert('Form has been reset.'); };
+  const handleReset = () => { 
+    setTitle(''); 
+    setEmojiImage(null); 
+    setImagePreview(null); 
+    setUploadProgress('');
+    alert('Form has been reset.'); 
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -130,24 +127,56 @@ const AddEmoji = () => {
       return;
     }
     setIsLoading(true);
+    setUploadProgress('Uploading image...');
 
     try {
-      const base64Image = await fileToBase64(emojiImage);
-      const payload = { title: title, img: base64Image };
+      // Step 1: Upload image to S3 via /uploads endpoint
+      const formData = new FormData();
+      formData.append('file', emojiImage);
       
-      // *** MODIFIED PART: Call the API using the VisionBase class ***
+      const uploadResult = await VisionBase.post('/uploads', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      console.log('Upload result:', uploadResult);
+      // Extract the S3 URL from upload response
+      const imageUrl = uploadResult.data.data.fileUrl;
+      
+      if (!imageUrl) {
+        throw new Error('Failed to get image URL from upload response');
+      }
+
+      setUploadProgress('Saving emoji...');
+
+      // Step 2: Create emoji with the S3 URL
+      const payload = { 
+        title: title, 
+        img: imageUrl  // Use the S3 URL instead of base64
+      };
+      
       const result = await VisionBase.post('/add-emoji', payload);
       
       console.log('Success:', result.message);
-      alert('Emoji created successfully! Check the console for API simulation details.');
+      alert('Emoji created successfully! Check the console for API response details.');
       handleReset();
       navigate('/allemoji');
 
     } catch (error) {
-      console.error('Submission failed in component:', error);
-      alert(`An error occurred: ${error.message}`);
+      console.error('Submission failed:', error);
+      
+      // More detailed error handling
+      let errorMessage = 'An error occurred while creating the emoji.';
+      if (error.response) {
+        errorMessage = error.response.data.message || error.response.data.error || errorMessage;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      alert(`Error: ${errorMessage}`);
     } finally {
       setIsLoading(false);
+      setUploadProgress('');
     }
   };
 
@@ -182,12 +211,34 @@ const AddEmoji = () => {
         
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-8">
-            <FormRow label="Emoji Title" required>
-              <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Enter emoji title..." className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-violet-400 focus:border-transparent text-sm bg-white/70 backdrop-blur-sm shadow-sm transition-all placeholder-gray-400" disabled={isLoading}/>
-            </FormRow>
+           <FormRow label="Emoji Title" required>
+  <input 
+    type="text" 
+    value={title} 
+    onChange={(e) => {
+      // Remove all apostrophes from the input value
+      const cleanedValue = e.target.value.replace(/'/g, '');
+      setTitle(cleanedValue);
+    }} 
+    placeholder="Enter emoji title..." 
+    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-violet-400 focus:border-transparent text-sm bg-white/70 backdrop-blur-sm shadow-sm transition-all placeholder-gray-400" 
+    disabled={isLoading}
+  />
+</FormRow>
             <FormRow label="Emoji Image" required>
               <ModernFileUpload onFileChange={handleImageChange} preview={imagePreview} onRemove={handleRemoveImage} disabled={isLoading}/>
             </FormRow>
+            
+            {/* Progress indicator */}
+            {uploadProgress && (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent mr-3"></div>
+                  <span className="text-sm font-medium text-blue-700">{uploadProgress}</span>
+                </div>
+              </div>
+            )}
+            
             <div className="flex flex-col sm:flex-row justify-start space-y-3 sm:space-y-0 sm:space-x-4 pt-6">
               <button type="submit" disabled={isLoading || !title || !emojiImage} className="inline-flex items-center justify-center px-8 py-3 text-sm font-semibold text-white bg-gradient-to-r from-violet-500 to-purple-500 rounded-xl shadow-lg hover:shadow-xl hover:from-violet-600 hover:to-purple-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-violet-500 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed disabled:shadow-none transition-all duration-200">
                 {isLoading ? (<><div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>Creating...</>) : (<><Send className="h-4 w-4 mr-2" />Create Emoji</>)}

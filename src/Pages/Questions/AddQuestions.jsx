@@ -56,6 +56,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GripVertical, PlusCircle, Trash2, Loader2, Users, Vote } from "lucide-react";
 import { VisionBase } from "@/utils/axiosInstance";
 
+// Helper function to remove apostrophes
+const removeApostrophes = (text) => text.replace(/'/g, '');
+
 // --- ZOD SCHEMA for FORM VALIDATION ---
 const formSchema = z.object({
   electionId: z.string().min(1, "An election must be selected."),
@@ -137,16 +140,16 @@ function EmojiSelector({ availableEmojis, selectedOptions, onSelectionChange }) 
     if (checked) {
       const newOption = {
         id: `emoji-${emoji.title}-${Date.now()}`,
-        text: emoji.title,
+        text: removeApostrophes(emoji.title), // Remove apostrophes from emoji title
         img: emoji.img,
       };
       onSelectionChange([...selectedOptions, newOption]);
     } else {
-      onSelectionChange(selectedOptions.filter(opt => opt.text !== emoji.title));
+      onSelectionChange(selectedOptions.filter(opt => opt.text !== removeApostrophes(emoji.title)));
     }
   };
 
-  const isSelected = (emoji) => selectedOptions.some(opt => opt.text === emoji.title);
+  const isSelected = (emoji) => selectedOptions.some(opt => opt.text === removeApostrophes(emoji.title));
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-4 border rounded-md bg-slate-50 dark:bg-slate-900 max-h-60 overflow-y-auto">
@@ -177,7 +180,7 @@ function DynamicOptionSelector({ parties, candidates, selectedOptions, onSelecti
     if (checked) {
       const newOption = {
         id: `party-${party.party_id}-${Date.now()}`,
-        text: party.party_name,
+        text: removeApostrophes(party.party_name), // Remove apostrophes from party name
         img: party.party_logo,
         type: 'party',
         originalId: party.party_id,
@@ -194,10 +197,10 @@ function DynamicOptionSelector({ parties, candidates, selectedOptions, onSelecti
     if (checked) {
       const newOption = {
         id: `candidate-${candidate.candidate_id}-${Date.now()}`,
-        text: candidate.candidate_name,
+        text: removeApostrophes(candidate.candidate_name), // Remove apostrophes from candidate name
         type: 'candidate',
         originalId: candidate.candidate_id,
-        partyName: candidate.party_name,
+        partyName: removeApostrophes(candidate.party_name || ''), // Clean party name too
       };
       onSelectionChange([...selectedOptions, newOption]);
     } else {
@@ -369,7 +372,7 @@ export default function AddQuestions() {
     }
     const newOption = {
       id: `option-${Date.now()}`, // Unique ID for dnd-kit
-      text: newOptionText.trim(),
+      text: removeApostrophes(newOptionText.trim()), // Clean apostrophes here
     };
     setOptions((prev) => [...prev, newOption]);
     setNewOptionText("");
@@ -573,7 +576,18 @@ export default function AddQuestions() {
                   <FormItem>
                     <FormLabel>Question Title</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., Who is your preferred candidate?" {...field} />
+                      <Input 
+                        placeholder="e.g., Who is your preferred candidate?" 
+                        value={field.value}
+                        onChange={(e) => {
+                          // Remove all apostrophes from the input value
+                          const cleanedValue = removeApostrophes(e.target.value);
+                          field.onChange(cleanedValue);
+                        }}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                        ref={field.ref}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -625,7 +639,11 @@ export default function AddQuestions() {
                     <Input
                       placeholder="Add an option"
                       value={newOptionText}
-                      onChange={(e) => setNewOptionText(e.target.value)}
+                      onChange={(e) => {
+                        // Remove apostrophes from manual option input
+                        const cleanedValue = removeApostrophes(e.target.value);
+                        setNewOptionText(cleanedValue);
+                      }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
                           e.preventDefault();

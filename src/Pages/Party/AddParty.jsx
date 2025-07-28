@@ -8,8 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { VisionBase } from '@/utils/axiosInstance';
 
-
-
 // A reusable form row component for consistent styling
 const FormRow = ({ label, required, children }) => (
     <div className="flex flex-col md:flex-row items-start md:items-center border-b border-dotted border-gray-200 py-4 last:border-b-0">
@@ -30,31 +28,22 @@ const AddParty = () => {
 
     const initialFormData = {
         partyName: '',
-        partyLogo: '', // Will store base64 string
+        partyLogo: null, // Will store the file object instead of base64
     };
 
     const [formData, setFormData] = useState(initialFormData);
     const [logoPreview, setLogoPreview] = useState(null);
     const [isDragOver, setIsDragOver] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState('');
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    // Convert file to base64
-    const fileToBase64 = (file) => {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = () => resolve(reader.result);
-            reader.onerror = (error) => reject(error);
-        });
-    };
-
     // Handle file selection
-    const handleFileSelect = async (file) => {
+    const handleFileSelect = (file) => {
         if (!file) return;
 
         // Validate file type
@@ -69,14 +58,9 @@ const AddParty = () => {
             return;
         }
 
-        try {
-            const base64String = await fileToBase64(file);
-            setFormData(prev => ({ ...prev, partyLogo: base64String }));
-            setLogoPreview(base64String);
-        } catch (error) {
-            console.error('Error converting file to base64:', error);
-            alert('Error processing the image file');
-        }
+        // Store the file object and create preview URL
+        setFormData(prev => ({ ...prev, partyLogo: file }));
+        setLogoPreview(URL.createObjectURL(file));
     };
 
     // Handle file input change
@@ -105,7 +89,10 @@ const AddParty = () => {
 
     // Remove selected logo
     const removeLogo = () => {
-        setFormData(prev => ({ ...prev, partyLogo: '' }));
+        setFormData(prev => ({ ...prev, partyLogo: null }));
+        if (logoPreview) {
+            URL.revokeObjectURL(logoPreview); // Clean up object URL
+        }
         setLogoPreview(null);
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
@@ -121,39 +108,85 @@ const AddParty = () => {
         }
 
         setIsSubmitting(true);
+        setUploadProgress('');
 
         try {
+            let logoUrl = null;
+
+            // Step 1: Upload logo to S3 if a file is selected
+            if (formData.partyLogo) {
+                setUploadProgress('Uploading logo...');
+                
+                const logoFormData = new FormData();
+                logoFormData.append('file', formData.partyLogo);
+                
+                const uploadResult = await VisionBase.post('/uploads', logoFormData, {
+                    headers: {
+                        'Content-Type': 'multipart/form-data',
+                    },
+                });
+                
+                console.log('Logo upload result:', uploadResult);
+                
+                // Extract the S3 URL from upload response
+                logoUrl = uploadResult.data.data.fileUrl;
+                
+                if (!logoUrl) {
+                    throw new Error('Failed to get logo URL from upload response');
+                }
+            }
+
+            setUploadProgress('Saving party...');
+
+            // Step 2: Create party with the S3 URL (or null if no logo)
             const payload = {
                 party_name: formData.partyName.trim(),
-                party_logo: formData.partyLogo || null
+                party_logo: logoUrl
             };
 
-            // Uncomment and use this when VisionBase is available
-            await VisionBase.post('/add-party', payload);
+            const result = await VisionBase.post('/add-party', payload);
             
+            console.log('Success:', result.message);
             alert("Party added successfully!");
             
             // Reset form after successful submission
             setFormData(initialFormData);
+            if (logoPreview) {
+                URL.revokeObjectURL(logoPreview); // Clean up object URL
+            }
             setLogoPreview(null);
             if (fileInputRef.current) {
                 fileInputRef.current.value = '';
             }
             
-            // Optionally navigate back to the party list
+            // Navigate back to the party list
             navigate('/allparty');
             
         } catch (error) {
             console.error('Error adding party:', error);
-            alert('Error adding party. Please try again.');
+            
+            // More detailed error handling
+            let errorMessage = 'An error occurred while adding the party.';
+            if (error.response) {
+                errorMessage = error.response.data.message || error.response.data.error || errorMessage;
+            } else if (error.message) {
+                errorMessage = error.message;
+            }
+            
+            alert(`Error: ${errorMessage}`);
         } finally {
             setIsSubmitting(false);
+            setUploadProgress('');
         }
     };
 
     const handleReset = () => {
         setFormData(initialFormData);
+        if (logoPreview) {
+            URL.revokeObjectURL(logoPreview); // Clean up object URL
+        }
         setLogoPreview(null);
+        setUploadProgress('');
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
         }
@@ -235,11 +268,11 @@ const AddParty = () => {
                                                 isDragOver 
                                                     ? 'border-brand-primary bg-brand-primary/5' 
                                                     : 'border-gray-300 hover:border-gray-400'
-                                            }`}
+                                            } ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
                                             onDragOver={handleDragOver}
                                             onDragLeave={handleDragLeave}
                                             onDrop={handleDrop}
-                                            onClick={() => fileInputRef.current?.click()}
+                                            onClick={() => !isSubmitting && fileInputRef.current?.click()}
                                         >
                                             <Upload className="h-8 w-8 mx-auto mb-2 text-gray-400" />
                                             <p className="text-sm text-gray-600">
@@ -274,7 +307,7 @@ const AddParty = () => {
                                                     type="button"
                                                     variant="outline"
                                                     size="sm"
-                                                    onClick={() => fileInputRef.current?.click()}
+                                                    onClick={() => !isSubmitting && fileInputRef.current?.click()}
                                                     disabled={isSubmitting}
                                                 >
                                                     Change Logo
@@ -284,6 +317,16 @@ const AddParty = () => {
                                     )}
                                 </div>
                             </FormRow>
+
+                            {/* Progress indicator */}
+                            {uploadProgress && (
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                                    <div className="flex items-center">
+                                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-500 border-t-transparent mr-3"></div>
+                                        <span className="text-sm font-medium text-blue-700">{uploadProgress}</span>
+                                    </div>
+                                </div>
+                            )}
                             
                             <div className="flex justify-start pt-8">
                                 <Button 
@@ -291,8 +334,17 @@ const AddParty = () => {
                                     className="bg-brand-primary text-white hover:bg-brand-primary-dark mr-3 flex items-center"
                                     disabled={isSubmitting}
                                 >
-                                    <ChevronRight className="h-4 w-4" /> 
-                                    <span>{isSubmitting ? 'Submitting...' : 'Submit'}</span>
+                                    {isSubmitting ? (
+                                        <>
+                                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
+                                            <span>Submitting...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <ChevronRight className="h-4 w-4" /> 
+                                            <span>Submit</span>
+                                        </>
+                                    )}
                                 </Button>
                                 <Button
                                     type="button"
