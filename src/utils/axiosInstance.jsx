@@ -1,9 +1,9 @@
 import axios from 'axios';
 
 // Determine the baseURL based on environment
-const baseURL = window.location.hostname === 'localhost'
+const baseURL = window.location.hostname === 'ocalhost'
   ? 'http://localhost:5008/api/v1'
-  : 'http://16.171.151.86:5008/api/v1/';
+  : 'http://backend.visiondata.live/api/v1/';
 
 // const baseURL = "http://localhost:5008/api/v1";
 // Create the Axios instance

@@ -28,82 +28,82 @@ const handleApiSubmission = async (chartTitle, data) => {
 // ===================================================================================
 const totalRecordsData = { survey: 12530, qc: 152, zc: 84, ot: 311 };
 const surveyProgressData = [
-  { day: 'Day 1', surveys: 450, bilingualLabel: 'দিন ১ / Day 1' },
-  { day: 'Day 2', surveys: 980, bilingualLabel: 'দিন ২ / Day 2' },
-  { day: 'Day 3', surveys: 1530, bilingualLabel: 'দিন ৩ / Day 3' },
-  { day: 'Day 4', surveys: 2840, bilingualLabel: 'দিন ৪ / Day 4' },
-  { day: 'Day 5', surveys: 4120, bilingualLabel: 'দিন ৫ / Day 5' },
-  { day: 'Day 6', surveys: 6780, bilingualLabel: 'দিন ৬ / Day 6' },
-  { day: 'Day 7', surveys: 8990, bilingualLabel: 'দিন ৭ / Day 7' },
-  { day: 'Day 8', surveys: 10820, bilingualLabel: 'দিন ৮ / Day 8' },
-  { day: 'Day 9', surveys: 12530, bilingualLabel: 'দিন ৯ / Day 9' },
+  { day: 'Day 1', surveys: 450, bilingualLabel: 'Day 1' },
+  { day: 'Day 2', surveys: 980, bilingualLabel: 'Day 2' },
+  { day: 'Day 3', surveys: 1530, bilingualLabel: 'Day 3' },
+  { day: 'Day 4', surveys: 2840, bilingualLabel: 'Day 4' },
+  { day: 'Day 5', surveys: 4120, bilingualLabel: 'Day 5' },
+  { day: 'Day 6', surveys: 6780, bilingualLabel: 'Day 6' },
+  { day: 'Day 7', surveys: 8990, bilingualLabel: 'Day 7' },
+  { day: 'Day 8', surveys: 10820, bilingualLabel: 'Day 8' },
+  { day: 'Day 9', surveys: 12530, bilingualLabel: 'Day 9' },
 ];
 const ageData = [
-  { name: 'Above 60', value: 1179, bilingualLabel: '৬০ ৰ ওপৰত / Above 60' },
-  { name: '46-60', value: 2175, bilingualLabel: '৪৬-৬০ / 46-60' },
-  { name: '36-45', value: 2718, bilingualLabel: '৩৬-৪৫ / 36-45' },
-  { name: '24-35', value: 3086, bilingualLabel: '২৪-৩৫ / 24-35' },
-  { name: '18-23', value: 871, bilingualLabel: '১৮-২৩ / 18-23' },
+  { name: 'Above 60', value: 1179, bilingualLabel: 'Above 60' },
+  { name: '46-60', value: 2175, bilingualLabel: '46-60' },
+  { name: '36-45', value: 2718, bilingualLabel: '36-45' },
+  { name: '24-35', value: 3086, bilingualLabel: '24-35' },
+  { name: '18-23', value: 871, bilingualLabel: '18-23' },
 ];
 const AGE_COLORS = ['#8B5CF6', '#06B6D4', '#10B981', '#F59E0B', '#EF4444'];
 const genderData = [
-    { name: 'Male', value: 5446, bilingualLabel: 'পুৰুষ / Male' },
-    { name: 'Female', value: 7076, bilingualLabel: 'মহিলা / Female' },
-    { name: 'Other', value: 8, bilingualLabel: 'অন্যান্য / Other' },
+    { name: 'Male', value: 5446, bilingualLabel: 'Male' },
+    { name: 'Female', value: 7076, bilingualLabel: 'Female' },
+    { name: 'Other', value: 8, bilingualLabel: 'Other' },
 ];
 const GENDER_COLORS = ['#3B82F6', '#EC4899', '#8B5CF6'];
 const educationData = [
-  { name: 'Illiterate', value: 2698, bilingualLabel: 'অশিক্ষিত / Illiterate' },
-  { name: 'Primary', value: 3933, bilingualLabel: 'প্ৰাথমিক / Primary' },
-  { name: 'High School', value: 1783, bilingualLabel: 'হাইস্কুল / High School' },
-  { name: '12th Pass', value: 1033, bilingualLabel: 'দ্বাদশ উত্তীৰ্ণ / 12th Pass' },
-  { name: 'Graduate', value: 538, bilingualLabel: 'স্নাতক / Graduate' },
-  { name: 'Postgraduate', value: 44, bilingualLabel: 'স্নাতকোত্তৰ / Postgraduate' },
+  { name: 'Illiterate', value: 2698, bilingualLabel: 'Illiterate' },
+  { name: 'Primary', value: 3933, bilingualLabel: 'Primary' },
+  { name: 'High School', value: 1783, bilingualLabel: 'High School' },
+  { name: '12th Pass', value: 1033, bilingualLabel: '12th Pass' },
+  { name: 'Graduate', value: 538, bilingualLabel: 'Graduate' },
+  { name: 'Postgraduate', value: 44, bilingualLabel: 'Postgraduate' },
 ];
 const EDUCATION_COLORS = ['#EF4444', '#F59E0B', '#10B981', '#06B6D4', '#8B5CF6', '#EC4899'];
 const religionData = [
-    { name: 'Hinduism', value: 8721, bilingualLabel: 'হিন্দু / Hinduism' },
-    { name: 'Islam', value: 3502, bilingualLabel: 'ইছলাম / Islam' },
-    { name: 'Christianity', value: 251, bilingualLabel: 'খ্ৰীষ্টান / Christianity' },
-    { name: 'Other', value: 56, bilingualLabel: 'অন্যান্য / Other' },
+    { name: 'Hinduism', value: 8721, bilingualLabel: ' Hinduism' },
+    { name: 'Islam', value: 3502, bilingualLabel: 'Islam' },
+    { name: 'Christianity', value: 251, bilingualLabel: 'Christianity' },
+    { name: 'Other', value: 56, bilingualLabel: 'Other' },
 ];
 const RELIGION_COLORS = ['#F97316', '#10B981', '#3B82F6', '#6B7280'];
 const casteData = [
-    { name: 'General', value: 4890, bilingualLabel: 'সাধাৰণ / General' },
-    { name: 'OBC', value: 5123, bilingualLabel: 'অবিচি / OBC' },
-    { name: 'SC', value: 1543, bilingualLabel: 'এছচি / SC' },
-    { name: 'ST', value: 974, bilingualLabel: 'এছটি / ST' },
+    { name: 'General', value: 4890, bilingualLabel: ' General' },
+    { name: 'OBC', value: 5123, bilingualLabel: 'OBC' },
+    { name: 'SC', value: 1543, bilingualLabel: ' SC' },
+    { name: 'ST', value: 974, bilingualLabel: 'ST' },
 ];
 const CASTE_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444'];
 const occupationData = [
-  { name: 'Housewife', value: 4158, bilingualLabel: 'গৃহিণী / Housewife' },
-  { name: 'Unskilled Labor', value: 2071, bilingualLabel: 'অদক্ষ শ্ৰমিক / Unskilled Labor' },
-  { name: 'Farmer', value: 1208, bilingualLabel: 'কৃষক / Farmer' },
-  { name: 'Unemployed', value: 782, bilingualLabel: 'বেকাৰ / Unemployed' },
-  { name: 'Small Business', value: 495, bilingualLabel: 'সৰু ব্যৱসায় / Small Business' },
-  { name: 'Student', value: 463, bilingualLabel: 'ছাত্র-ছাত্রী / Student' },
-  { name: 'Other', value: 280, bilingualLabel: 'অন্যান্য / Other' },
+  { name: 'Housewife', value: 4158, bilingualLabel: 'Housewife' },
+  { name: 'Unskilled Labor', value: 2071, bilingualLabel: 'Unskilled Labor' },
+  { name: 'Farmer', value: 1208, bilingualLabel: 'Farmer' },
+  { name: 'Unemployed', value: 782, bilingualLabel: 'Unemployed' },
+  { name: 'Small Business', value: 495, bilingualLabel: 'Small Business' },
+  { name: 'Student', value: 463, bilingualLabel: 'Student' },
+  { name: 'Other', value: 280, bilingualLabel: 'Other' },
 ];
 const OCCUPATION_COLORS = ['#EC4899', '#F59E0B', '#10B981', '#EF4444', '#3B82F6', '#06B6D4', '#8B5CF6'];
 const localIssuesData = [
-  { name: 'Poor Roads', value: 5102, bilingualLabel: 'ৰাস্তা-ঘাটৰ দুৰাৱস্থা / Poor Road Conditions' },
-  { name: 'Unemployment', value: 4855, bilingualLabel: 'নিবনুৱা সমস্যা / Unemployment' },
-  { name: 'Inflation', value: 3987, bilingualLabel: 'মূল্যবৃদ্ধি / Inflation' },
-  { name: 'Lack of Drinking Water', value: 2431, bilingualLabel: 'খোৱা পানীৰ সমস্যা / Lack of Drinking Water' },
-  { name: 'Poor Healthcare', value: 1899, bilingualLabel: 'চিকিৎসা ব্যৱস্থাৰ অভাৱ / Poor Healthcare' },
-  { name: 'Flood & Erosion', value: 1560, bilingualLabel: 'বানপানী আৰু গৰাখহনীয়া / Flood & Erosion' },
+  { name: 'Poor Roads', value: 5102, bilingualLabel: 'Poor Road Conditions' },
+  { name: 'Unemployment', value: 4855, bilingualLabel: 'Unemployment' },
+  { name: 'Inflation', value: 3987, bilingualLabel: 'Inflation' },
+  { name: 'Lack of Drinking Water', value: 2431, bilingualLabel: 'Lack of Drinking Water' },
+  { name: 'Poor Healthcare', value: 1899, bilingualLabel: 'Poor Healthcare' },
+  { name: 'Flood & Erosion', value: 1560, bilingualLabel: 'Flood & Erosion' },
 ];
 const mlaReelectionData = [
-    { name: 'Yes', value: 6050, bilingualLabel: 'হয় / Yes' },
-    { name: 'No', value: 3927, bilingualLabel: 'নহয় / No' },
-    { name: 'Can\'t say', value: 2552, bilingualLabel: 'ক\'ব নোৱাৰো / Can\'t say' },
+    { name: 'Yes', value: 6050, bilingualLabel: 'Yes' },
+    { name: 'No', value: 3927, bilingualLabel: 'No' },
+    { name: 'Can\'t say', value: 2552, bilingualLabel: ' Can\'t say' },
 ];
 const MLA_REELECTION_COLORS = ['#10B981', '#EF4444', '#6B7280'];
 const nextCMChoiceData = [
-    { name: 'Himanta Biswa Sarma', value: 9546, bilingualLabel: 'হিমন্ত বিশ্ব শৰ্মা / Himanta Biswa Sarma' },
-    { name: 'Gaurav Gogoi', value: 851, bilingualLabel: 'গৌৰৱ গগৈ / Gaurav Gogoi' },
-    { name: 'Sarbananda Sonowal', value: 722, bilingualLabel: 'সৰ্বানন্দ সোণোৱাল / Sarbananda Sonowal' },
-    { name: 'Other', value: 1411, bilingualLabel: 'অন্য / Other' },
+    { name: 'Himanta Biswa Sarma', value: 9546, bilingualLabel: ' Himanta Biswa Sarma' },
+    { name: 'Gaurav Gogoi', value: 851, bilingualLabel: 'aurav Gogoi' },
+    { name: 'Sarbananda Sonowal', value: 722, bilingualLabel: 'Sarbananda Sonowal' },
+    { name: 'Other', value: 1411, bilingualLabel: 'Other' },
 ];
 const NEXT_CM_CHOICE_COLORS = ['#F97316', '#3B82F6', '#F59E0B', '#6B7280'];
 
@@ -322,26 +322,26 @@ const SurveyDashboard = () => {
     <div className="space-y-8">
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard icon={Users} title="মুঠ সমীক্ষা / Total Surveys" value={totalRecordsData.survey} colorClass="bg-gradient-to-br from-indigo-500 to-indigo-600" trend="+12.3%"/>
-        <StatCard icon={UserCheck} title="মুঠ QC ৰেকৰ্ড / Total QC" value={totalRecordsData.qc} colorClass="bg-gradient-to-br from-emerald-500 to-emerald-600" trend="+8.1%"/>
-        <StatCard icon={UserCog} title="মুঠ ZC ৰেকৰ্ড / Total ZC" value={totalRecordsData.zc} colorClass="bg-gradient-to-br from-purple-500 to-purple-600" trend="+5.7%"/>
-        <StatCard icon={UserX} title="মুঠ OT ৰেকৰ্ড / Total OT" value={totalRecordsData.ot} colorClass="bg-gradient-to-br from-pink-500 to-pink-600" trend="+15.2%"/>
+        <StatCard icon={Users} title="Total Surveys" value={totalRecordsData.survey} colorClass="bg-gradient-to-br from-indigo-500 to-indigo-600" trend="+12.3%"/>
+        <StatCard icon={UserCheck} title="Total QC" value={totalRecordsData.qc} colorClass="bg-gradient-to-br from-emerald-500 to-emerald-600" trend="+8.1%"/>
+        <StatCard icon={UserCog} title="Total ZC" value={totalRecordsData.zc} colorClass="bg-gradient-to-br from-purple-500 to-purple-600" trend="+5.7%"/>
+        <StatCard icon={UserX} title="Total OT" value={totalRecordsData.ot} colorClass="bg-gradient-to-br from-pink-500 to-pink-600" trend="+15.2%"/>
       </div>
       
       {/* Time Series Chart */}
-      <GenericAreaChart title="দৈনিক সমীক্ষাৰ অগ্ৰগতি / Daily Survey Progress" data={surveyProgressData} color="#4f46e5" icon={TrendingUp} />
+      <GenericAreaChart title="Daily Survey Progress" data={surveyProgressData} color="#4f46e5" icon={TrendingUp} />
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
-        <GenericPieChart title="বয়স / Age" data={ageData} colors={AGE_COLORS} icon={Calendar} />
-        <GenericPieChart title="লিঙ্গ / Gender" data={genderData} colors={GENDER_COLORS} icon={Users2} />
-        <GenericPieChart title="শিক্ষা / Education" data={educationData} colors={EDUCATION_COLORS} icon={BookOpen} />
-        <GenericPieChart title="ধৰ্ম / Religion" data={religionData} colors={RELIGION_COLORS} icon={Home} />
-        <GenericPieChart title="জাতি / Caste" data={casteData} colors={CASTE_COLORS} icon={Users} />
-        <GenericPieChart title="ব্যৱসায় / Occupation" data={occupationData} colors={OCCUPATION_COLORS} icon={Briefcase} />
-        <GenericHorizontalBarChart title="গুৰুত্বপূৰ্ণ স্থানীয় সমস্যা / Key Local Issues" data={localIssuesData} colors={['#EF4444', '#F97316', '#F59E0B', '#10B981', '#06B6D4', '#3B82F6']} icon={Rocket} />
-        <GenericPieChart title="বিধায়ক পুনৰ নিৰ্বাচন / MLA Re-election" data={mlaReelectionData} colors={MLA_REELECTION_COLORS} icon={Award} />
-        <GenericPieChart title="পৰৱৰ্তী ಮುಖ್ಯಮಂತ್ರಿ / Next CM" data={nextCMChoiceData} colors={NEXT_CM_CHOICE_COLORS} icon={Flag} />
+        <GenericPieChart title="Age" data={ageData} colors={AGE_COLORS} icon={Calendar} />
+        <GenericPieChart title="Gender" data={genderData} colors={GENDER_COLORS} icon={Users2} />
+        <GenericPieChart title="Education" data={educationData} colors={EDUCATION_COLORS} icon={BookOpen} />
+        <GenericPieChart title="Religion" data={religionData} colors={RELIGION_COLORS} icon={Home} />
+        <GenericPieChart title="Caste" data={casteData} colors={CASTE_COLORS} icon={Users} />
+        <GenericPieChart title="Occupation" data={occupationData} colors={OCCUPATION_COLORS} icon={Briefcase} />
+        <GenericHorizontalBarChart title="Key Local Issues" data={localIssuesData} colors={['#EF4444', '#F97316', '#F59E0B', '#10B981', '#06B6D4', '#3B82F6']} icon={Rocket} />
+        <GenericPieChart title="MLA Re-election" data={mlaReelectionData} colors={MLA_REELECTION_COLORS} icon={Award} />
+        <GenericPieChart title="Next CM" data={nextCMChoiceData} colors={NEXT_CM_CHOICE_COLORS} icon={Flag} />
       </div>
     </div>
   );
@@ -360,8 +360,8 @@ const Dashboard = () => {
         <div className="max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between py-5">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">বিশ্লেষণ ডেশ্ববৰ্ড / Analytics Dashboard</h1>
-              <p className="text-gray-500 mt-1 text-sm">সঠিক তথ্য আৰু বাস্তৱ-সময়ৰ নিৰীক্ষণ / Accurate data and real-time monitoring</p>
+              <h1 className="text-2xl font-bold text-gray-900">Analytics Dashboard</h1>
+              <p className="text-gray-500 mt-1 text-sm">Accurate data and real-time monitoring</p>
             </div>
             <div className="flex items-center gap-2 text-sm text-gray-500">
               <div className="relative flex items-center justify-center">
@@ -374,9 +374,9 @@ const Dashboard = () => {
           
           {/* Tabs */}
           <nav className="flex gap-2 bg-gray-100/50 p-1.5 rounded-xl backdrop-blur-sm w-full md:w-auto">
-            <TabButton active={activeTab === 'surveys'} onClick={() => setActiveTab('surveys')} icon={BarChart3}>সমীক্ষা বিশ্লেষণ / Survey Analytics</TabButton>
-            <TabButton active={activeTab === 'tracking'} onClick={() => setActiveTab('tracking')} icon={Navigation}>লাইভ ট্ৰেকিং / Live Tracking</TabButton>
-            <TabButton active={activeTab === 'livemap'} onClick={() => setActiveTab('livemap')} icon={MapPin}>লাইভ সমীক্ষা / Live Survey</TabButton>
+            <TabButton active={activeTab === 'surveys'} onClick={() => setActiveTab('surveys')} icon={BarChart3}>Survey Analytics</TabButton>
+            <TabButton active={activeTab === 'tracking'} onClick={() => setActiveTab('tracking')} icon={Navigation}>Live Tracking</TabButton>
+            <TabButton active={activeTab === 'livemap'} onClick={() => setActiveTab('livemap')} icon={MapPin}>Live Survey</TabButton>
           </nav>
         </div>
       </header>
