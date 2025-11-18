@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Home, ChevronRight, Menu, ArrowLeft, RefreshCw, FileText, Loader2 } from 'lucide-react';
-import { VisionBase } from '@/utils/axiosInstance'; // Assuming your axios instance is here
+import { VisionBase } from '@/utils/axiosInstance';
 
-// Assuming you have shadcn/ui components in these paths
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -11,7 +10,6 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 
-// A reusable form row component for consistent styling
 const FormRow = ({ label, required, children }) => (
     <div className="flex flex-col md:flex-row items-start md:items-center border-b border-dotted border-gray-200 py-4 last:border-b-0">
         <div className="w-full md:w-1/4 mb-2 md:mb-0 md:pr-4 text-left md:text-right">
@@ -33,6 +31,8 @@ const AddZone = () => {
         vidhanId: '',
         lat: '',
         lon: '',
+        range: '',
+        limit: '',
     };
 
     const [formData, setFormData] = useState(initialFormData);
@@ -40,7 +40,6 @@ const AddZone = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isLoadingVidhans, setIsLoadingVidhans] = useState(true);
 
-    // Fetch Vidhans for the dropdown
     useEffect(() => {
         const fetchVidhans = async () => {
             try {
@@ -88,21 +87,33 @@ const AddZone = () => {
             alert("Please enter a valid lon between -180 and 180.");
             return;
         }
+
+        // Validate range if provided
+        if (formData.range && (isNaN(formData.range) || formData.range < 0)) {
+            alert("Please enter a valid range (must be a positive number).");
+            return;
+        }
+
+        // Validate limit if provided
+        if (formData.limit && (isNaN(formData.limit) || formData.limit < 0 || !Number.isInteger(Number(formData.limit)))) {
+            alert("Please enter a valid survey per booth limit (must be a positive whole number).");
+            return;
+        }
         
         setIsSubmitting(true);
         try {
-            // Use the API endpoint '/add-booth' as requested
             const submissionData = {
-                zone_name: formData.name, // Adjust keys to match backend expectation
+                zone_name: formData.name,
                 vidhan_id: formData.vidhanId,
                 lat: formData.lat || null,
                 lon: formData.lon || null,
+                range: formData.range || null,
+                limit: formData.limit || null,
             };
 
             await VisionBase.post('/add-zone', submissionData);
 
-            // alert("Booth added successfully!");
-            navigate('/allbooths'); // Navigate to the list page on success
+            navigate('/allbooths');
         } catch (error) {
             console.error("Error submitting form:", error);
             alert(`Failed to add Booth. ${error.response?.data?.message || 'Please try again.'}`);
@@ -115,15 +126,13 @@ const AddZone = () => {
         setFormData(initialFormData);
     };
     
-    // Navigate to the booths list page
     const handleBack = () => {
-        navigate('/allbooths');
+        navigate('/allbooth');
     };
 
     return (
         <div className="bg-gray-50/50 min-h-screen p-4 sm:p-6 lg:p-8">
             <div className="max-w-7xl mx-auto">
-                {/* Header */}
                 <div className="flex justify-between items-start mb-4">
                     <div>
                         <h1 className="text-2xl font-bold text-gray-800">Booth</h1>
@@ -134,7 +143,6 @@ const AddZone = () => {
                     </div>
                 </div>
 
-                {/* Breadcrumbs */}
                 <div className="flex items-center text-sm text-gray-500 mb-6">
                     <Home className="h-4 w-4" />
                     <ChevronRight className="h-4 w-4 mx-1" />
@@ -145,7 +153,6 @@ const AddZone = () => {
                     <span className="text-gray-700 font-medium">Add Booth</span>
                 </div>
 
-                {/* Main Form Card */}
                 <Card className="shadow-sm">
                     <CardHeader className="flex flex-row items-center justify-between border-b">
                         <div className="flex items-center">
@@ -217,6 +224,32 @@ const AddZone = () => {
                                         disabled={isSubmitting}
                                         type="number"
                                         step="any"
+                                    />
+                                </FormRow>
+
+                                <FormRow label="Range (in kilometers)">
+                                    <Input
+                                        name="range"
+                                        value={formData.range}
+                                        onChange={handleInputChange}
+                                        placeholder="Enter range in kilometers (e.g., 5)"
+                                        disabled={isSubmitting}
+                                        type="number"
+                                        step="any"
+                                        min="0"
+                                    />
+                                </FormRow>
+
+                                <FormRow label="Survey per Booth">
+                                    <Input
+                                        name="limit"
+                                        value={formData.limit}
+                                        onChange={handleInputChange}
+                                        placeholder="Enter survey limit per booth (e.g., 100)"
+                                        disabled={isSubmitting}
+                                        type="number"
+                                        step="1"
+                                        min="0"
                                     />
                                 </FormRow>
                             </div>

@@ -1,5 +1,6 @@
 import { VisionBase } from '@/utils/axiosInstance';
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 // This single file contains the main component and mocks for UI/icons
 // to fulfill the request. In a real project, you would import these
@@ -127,10 +128,9 @@ const AddLoksabha = () => {
         setFormData(initialFormData);
         console.log("Form has been reset!");
     };
-
+const navigate = useNavigate();
     const handleBack = () => {
-        // In a real app, this would navigate to /allloksabha
-        console.log('Navigating back to all loksabha page');
+        navigate('/allloksabha');
     };
 
     const handleSubmit = async (e) => {
