@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Home, ChevronRight, Menu, ArrowLeft, RefreshCw, FileText, Loader2 } from 'lucide-react';
-import { VisionBase } from '@/utils/axiosInstance'; // Assuming your axios instance is here
+import { VisionBase } from '@/utils/axiosInstance';
 
-// Assuming you have shadcn/ui components in these paths
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -31,18 +30,18 @@ const AddCandidate = () => {
     const initialFormData = {
         electionId: '',
         partyId: '',
-        zoneId: '',
+        vidhanId: '',
         candidateName: '',
     };
 
     const [formData, setFormData] = useState(initialFormData);
     const [elections, setElections] = useState([]);
     const [parties, setParties] = useState([]);
-    const [zones, setZones] = useState([]);
+    const [vidhans, setVidhans] = useState([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isLoadingElections, setIsLoadingElections] = useState(true);
     const [isLoadingParties, setIsLoadingParties] = useState(true);
-    const [isLoadingZones, setIsLoadingZones] = useState(true);
+    const [isLoadingVidhans, setIsLoadingVidhans] = useState(true);
 
     // Fetch Elections for the dropdown
     useEffect(() => {
@@ -84,24 +83,24 @@ const AddCandidate = () => {
         fetchParties();
     }, []);
 
-    // Fetch Zones for the dropdown
+    // Fetch Vidhan Sabhas for the dropdown
     useEffect(() => {
-        const fetchZones = async () => {
+        const fetchVidhans = async () => {
             try {
-                setIsLoadingZones(true);
-                const response = await VisionBase.get('/zones');
+                setIsLoadingVidhans(true);
+                const response = await VisionBase.get('/vidhans');
                 if (response.data && response.data.data && response.data.data.rows) {
-                    setZones(response.data.data.rows);
+                    setVidhans(response.data.data.rows);
                 }
             } catch (error) {
-                console.error("Failed to fetch Zones:", error);
-                alert("Could not load Zone data. Please try refreshing the page.");
+                console.error("Failed to fetch Vidhan Sabhas:", error);
+                alert("Could not load Vidhan Sabha data. Please try refreshing the page.");
             } finally {
-                setIsLoadingZones(false);
+                setIsLoadingVidhans(false);
             }
         };
 
-        fetchZones();
+        fetchVidhans();
     }, []);
 
     const handleInputChange = (e) => {
@@ -117,16 +116,15 @@ const AddCandidate = () => {
         e.preventDefault();
 
         // Basic validation
-        if (!formData.electionId || !formData.partyId || !formData.zoneId || !formData.candidateName.trim()) {
+        if (!formData.electionId || !formData.partyId || !formData.vidhanId || !formData.candidateName.trim()) {
             alert("Please fill in all required fields.");
             return;
         }
         
         setIsSubmitting(true);
         try {
-            // Use the API endpoint '/add-candidate' as requested
             const submissionData = {
-                zone_id: formData.zoneId,
+                vidhan_id: formData.vidhanId,
                 party_id: formData.partyId,
                 candidate_name: formData.candidateName,
             };
@@ -134,7 +132,7 @@ const AddCandidate = () => {
             await VisionBase.post('/add-candidate', submissionData);
 
             alert("Candidate added successfully!");
-            navigate('/allcandidates'); // Navigate to the list page on success
+            navigate('/allcandidates');
         } catch (error) {
             console.error("Error submitting form:", error);
             alert(`Failed to add Candidate. ${error.response?.data?.message || 'Please try again.'}`);
@@ -241,22 +239,22 @@ const AddCandidate = () => {
                                     </Select>
                                 </FormRow>
 
-                                <FormRow label="Zone" required>
+                                <FormRow label="Vidhan Sabha" required>
                                     <Select 
-                                        onValueChange={(value) => handleSelectChange('zoneId', value)} 
-                                        value={formData.zoneId}
-                                        disabled={isLoadingZones || isSubmitting}
+                                        onValueChange={(value) => handleSelectChange('vidhanId', value)} 
+                                        value={formData.vidhanId}
+                                        disabled={isLoadingVidhans || isSubmitting}
                                     >
                                         <SelectTrigger>
-                                            <SelectValue placeholder={isLoadingZones ? "Loading Zones..." : "Select Zone"} />
+                                            <SelectValue placeholder={isLoadingVidhans ? "Loading Vidhan Sabhas..." : "Select Vidhan Sabha"} />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {isLoadingZones ? (
+                                            {isLoadingVidhans ? (
                                                 <SelectItem value="loading" disabled>Loading...</SelectItem>
                                             ) : (
-                                                zones.map((zone) => (
-                                                    <SelectItem key={zone.zone_id} value={zone.zone_id.toString()}>
-                                                        {zone.zone_name} - {zone.vidhan_name} <b>{zone.lok_name}</b> ({zone.state})
+                                                vidhans.map((vidhan) => (
+                                                    <SelectItem key={vidhan.vidhan_id} value={vidhan.vidhan_id.toString()}>
+                                                        {vidhan.vidhan_name} - {vidhan.lok_name} ({vidhan.state})
                                                     </SelectItem>
                                                 ))
                                             )}

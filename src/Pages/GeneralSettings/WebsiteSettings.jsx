@@ -145,7 +145,7 @@ const WebsiteSettings = () => {
     metaDescription: 'Vision Data - Powered by Abhasthra Technology Pvt. Ltd',
     phoneNumber: '6350669414',
     siteStatus: 'active',
-    copyrightText: 'Copyright © 2024 abhasthra.com All Rights Reserved.',
+    copyrightText: 'Copyright © 2025 abhasthra.com All Rights Reserved.',
     pageSizeAdmin: 10,
     siteLogo: null,
   };

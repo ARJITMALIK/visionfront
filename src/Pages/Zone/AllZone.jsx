@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { VisionBase } from '@/utils/axiosInstance'; // Assuming your axios instance is here
+import { VisionBase } from '@/utils/axiosInstance';
+import { toast, Toaster } from 'sonner';
 import {
   Home, ChevronRight, FileText, CheckSquare, Eye, Pencil, X, Trash2, Plus, Loader2, Search, Filter, RotateCcw
 } from 'lucide-react';
 
-// Assuming you have shadcn/ui components in these paths
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -18,6 +18,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter
 } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
@@ -49,11 +50,16 @@ const AllZones = () => {
     // State for UI interactions
     const [selectedRows, setSelectedRows] = useState([]);
     const [currentPage, setCurrentPage] = useState(1);
-    const [modalData, setModalData] = useState({ view: null, edit: null, delete: null });
+    const [modalData, setModalData] = useState({ view: null, edit: null, delete: null, bulkDelete: null });
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isBulkDeleting, setIsBulkDeleting] = useState(false);
     
     // State for edit form
-    const [editFormData, setEditFormData] = useState({ zone_name: '' });
+    const [editFormData, setEditFormData] = useState({ 
+        zone_name: '',
+        range: '',
+        limit: ''
+    });
 
     // State for filters and search
     const [searchTerm, setSearchTerm] = useState('');
@@ -76,6 +82,7 @@ const AllZones = () => {
             }
         } catch (err) {
             setError('Failed to fetch Zones data. Please try again.');
+            toast.error('Failed to fetch Zones data');
             console.error(err);
         } finally {
             setLoading(false);
@@ -107,6 +114,7 @@ const AllZones = () => {
         if (searchTerm) {
             filtered = filtered.filter(zone =>
                 zone.zone_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                zone.zone_id?.toString().includes(searchTerm) ||
                 zone.vidhan_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 zone.lok_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 zone.state?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -135,15 +143,14 @@ const AllZones = () => {
             lok_name: '',
             state: ''
         });
-        setSelectedRows([]); // Clear selections when resetting filters
+        setSelectedRows([]);
     };
 
     // Update filter
     const updateFilter = (key, value) => {
-        // Convert "all" back to empty string for filtering logic
         const filterValue = value === "all" ? "" : value;
         setFilters(prev => ({ ...prev, [key]: filterValue }));
-        setSelectedRows([]); // Clear selections when changing filters
+        setSelectedRows([]);
     };
 
     const handleSelectAll = (checked) => {
@@ -158,18 +165,22 @@ const AllZones = () => {
 
     const openModal = (type, data) => {
         if (type === 'edit') {
-            setEditFormData({ zone_name: data.zone_name });
+            setEditFormData({ 
+                zone_name: data.zone_name,
+                range: data.range || '',
+                limit: data.limit || ''
+            });
         }
         setModalData(prev => ({ ...prev, [type]: data }));
     };
 
     const closeModal = (type) => {
-        if (isSubmitting) return;
+        if (isSubmitting || isBulkDeleting) return;
         setModalData(prev => ({ ...prev, [type]: null }));
     };
     
     const handleAddNew = () => {
-        navigate('/addzone'); // Navigate to add zone page
+        navigate('/addbooth');
     };
     
     const confirmDelete = async () => {
@@ -178,11 +189,11 @@ const AllZones = () => {
         try {
             await VisionBase.delete(`/zone/${modalData.delete.zone_id}`);
             setZonesData(prev => prev.filter(item => item.zone_id !== modalData.delete.zone_id));
-            alert(`Zone "${modalData.delete.zone_name}" deleted successfully!`);
+            toast.success(`Zone "${modalData.delete.zone_name}" deleted successfully!`);
             closeModal('delete');
         } catch (err) {
             console.error("Delete failed:", err);
-            alert(`Failed to delete. ${err.response?.data?.message || 'Please try again.'}`);
+            toast.error(err.response?.data?.message || 'Failed to delete zone. Please try again.');
         } finally {
             setIsSubmitting(false);
         }
@@ -190,59 +201,106 @@ const AllZones = () => {
 
     const handleUpdate = async () => {
         if (!modalData.edit || !editFormData.zone_name.trim()) {
-            alert("Zone name cannot be empty.");
+            toast.error("Zone name cannot be empty.");
             return;
         }
+
+        // Validate range if provided
+        if (editFormData.range && (isNaN(editFormData.range) || editFormData.range < 0)) {
+            toast.error("Please enter a valid range (must be a positive number).");
+            return;
+        }
+
+        // Validate limit if provided
+        if (editFormData.limit && (isNaN(editFormData.limit) || editFormData.limit < 0 || !Number.isInteger(Number(editFormData.limit)))) {
+            toast.error("Please enter a valid survey limit (must be a positive whole number).");
+            return;
+        }
+
         setIsSubmitting(true);
         try {
-            const payload = { zone_name: editFormData.zone_name };
+            const payload = { 
+                zone_name: editFormData.zone_name,
+                range: editFormData.range || null,
+                limit: editFormData.limit || null
+            };
             await VisionBase.put(`/zone/${modalData.edit.zone_id}`, payload);
             
             setZonesData(prev => prev.map(item => 
                 item.zone_id === modalData.edit.zone_id ? { ...item, ...payload } : item
             ));
-            alert(`Zone updated successfully!`);
+            toast.success('Zone updated successfully!');
             closeModal('edit');
         } catch (err) {
             console.error("Update failed:", err);
-            alert(`Failed to update. ${err.response?.data?.message || 'Please try again.'}`);
+            toast.error(err.response?.data?.message || 'Failed to update zone. Please try again.');
         } finally {
             setIsSubmitting(false);
         }
     };
 
-    const handleBulkDelete = async () => {
+    const handleBulkDeleteClick = () => {
         if (selectedRows.length === 0) {
-            alert("Please select rows to delete.");
+            toast.error("Please select at least one zone to delete.");
             return;
         }
-        if (!window.confirm(`Are you sure you want to delete ${selectedRows.length} record(s)?`)) return;
-
-        const originalData = [...zonesData];
-        // Optimistic UI update
-        setZonesData(prev => prev.filter(item => !selectedRows.includes(item.zone_id)));
         
+        const zonesToDelete = zonesData.filter(zone => selectedRows.includes(zone.zone_id));
+        openModal('bulkDelete', zonesToDelete);
+    };
+
+    const confirmBulkDelete = async () => {
+        if (!modalData.bulkDelete || modalData.bulkDelete.length === 0) return;
+        
+        setIsBulkDeleting(true);
         try {
-            await Promise.all(selectedRows.map(id => VisionBase.delete(`/zone/${id}`)));
-            alert(`Successfully deleted ${selectedRows.length} records.`);
+            const idsToDelete = modalData.bulkDelete.map(zone => zone.zone_id);
+            
+            await VisionBase.delete('/delete-zones', {
+                data: { ids: idsToDelete }
+            });
+
+            setZonesData(prev => prev.filter(zone => !idsToDelete.includes(zone.zone_id)));
             setSelectedRows([]);
+            toast.success(`Successfully deleted ${idsToDelete.length} zone(s).`);
+            closeModal('bulkDelete');
         } catch (err) {
             console.error("Bulk delete failed:", err);
-            alert("Failed to delete some records. Reverting changes.");
-            setZonesData(originalData); // Rollback on failure
+            toast.error(err.response?.data?.message || "Failed to delete zones. Please try again.");
+        } finally {
+            setIsBulkDeleting(false);
         }
     };
     
     if (loading) {
-        return <div className="p-8 text-center">Loading data...</div>;
+        return (
+            <div className="bg-gray-50/50 min-h-screen p-4 sm:p-6 lg:p-8 flex items-center justify-center">
+                <div className="text-center">
+                    <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto" />
+                    <p className="mt-2 text-gray-600">Loading zones data...</p>
+                </div>
+            </div>
+        );
     }
     
     if (error) {
-        return <div className="p-8 text-center text-red-500">{error}</div>;
+        return (
+            <div className="bg-gray-50/50 min-h-screen p-4 sm:p-6 lg:p-8 flex items-center justify-center">
+                <div className="text-center bg-red-50 border border-red-200 rounded-lg p-8">
+                    <Trash2 className="h-12 w-12 text-red-500 mx-auto mb-4" />
+                    <p className="text-lg text-red-700 mb-4">{error}</p>
+                    <Button onClick={fetchZones} className="bg-blue-600 hover:bg-blue-700">
+                        <RotateCcw className="h-4 w-4 mr-2" />
+                        Retry
+                    </Button>
+                </div>
+            </div>
+        );
     }
 
     return (
         <div className="bg-gray-50/50 min-h-screen p-4 sm:p-6 lg:p-8">
+            <Toaster richColors position="top-right" />
             <div className="max-w-full mx-auto">
                 {/* Header */}
                 <div className="flex justify-between items-start mb-4">
@@ -284,12 +342,17 @@ const AllZones = () => {
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                             <Input
-                                placeholder="Search zones, vidhan sabha, loksabha, or state..."
+                                placeholder="Search by ID, zone name, vidhan sabha, loksabha, or state..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 className="pl-10"
                             />
                         </div>
+                        {searchTerm && (
+                            <p className="text-sm text-gray-600">
+                                Found {filteredZones.length} result(s) for "{searchTerm}"
+                            </p>
+                        )}
 
                         {/* Filter Dropdowns */}
                         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -411,63 +474,101 @@ const AllZones = () => {
                                         <TableHead>Vidhan Sabha</TableHead>
                                         <TableHead>Loksabha Name</TableHead>
                                         <TableHead>State</TableHead>
-                                        <TableHead>Latitude</TableHead>
-                                        <TableHead>Longitude</TableHead>
+                                        <TableHead>Range (km)</TableHead>
+                                        <TableHead>Survey Limit</TableHead>
+                                        <TableHead>Surveys Filled</TableHead>
                                         <TableHead className="text-center">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {filteredZones.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={9} className="text-center py-8 text-gray-500">
+                                            <TableCell colSpan={10} className="text-center py-8 text-gray-500">
                                                 {searchTerm || filters.vidhan_name || filters.lok_name || filters.state 
                                                     ? "No zones found matching your search criteria." 
                                                     : "No zones available."}
                                             </TableCell>
                                         </TableRow>
                                     ) : (
-                                        filteredZones.map((zone) => (
-                                            <TableRow key={zone.zone_id}>
-                                                <TableCell className="px-4">
-                                                    <Checkbox 
-                                                        onCheckedChange={() => handleSelectRow(zone.zone_id)} 
-                                                        checked={selectedRows.includes(zone.zone_id)} 
-                                                    />
-                                                </TableCell>
-                                                <TableCell className="font-medium">{zone.zone_id}</TableCell>
-                                                <TableCell>{zone.zone_name}</TableCell>
-                                                <TableCell>{zone.vidhan_name}</TableCell>
-                                                <TableCell>{zone.lok_name}</TableCell>
-                                                <TableCell>{zone.state}</TableCell>
-                                                <TableCell>{zone.lat || 'N/A'}</TableCell>
-                                                <TableCell>{zone.lon || 'N/A'}</TableCell>
-                                                <TableCell>
-                                                    <div className="flex justify-center space-x-1">
-                                                        <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => openModal('view', zone)}>
-                                                            <Eye className="h-4 w-4" />
-                                                        </Button>
-                                                        <Button size="icon" className="h-8 w-8 bg-cyan-500 hover:bg-cyan-600 text-white" onClick={() => openModal('edit', zone)}>
-                                                            <Pencil className="h-4 w-4" />
-                                                        </Button>
-                                                        <Button size="icon" className="h-8 w-8 bg-red-500 hover:bg-red-600 text-white" onClick={() => openModal('delete', zone)}>
-                                                            <X className="h-4 w-4" />
-                                                        </Button>
-                                                    </div>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))
+                                        filteredZones.map((zone) => {
+                                            const surveyFilled = zone.surveyfilled || 0;
+                                            const surveyLimit = zone.limit || 0;
+                                            const isAtLimit = surveyLimit > 0 && surveyFilled >= surveyLimit;
+                                            const progressPercent = surveyLimit > 0 ? Math.min((surveyFilled / surveyLimit) * 100, 100) : 0;
+
+                                            return (
+                                                <TableRow key={zone.zone_id}>
+                                                    <TableCell className="px-4">
+                                                        <Checkbox 
+                                                            onCheckedChange={() => handleSelectRow(zone.zone_id)} 
+                                                            checked={selectedRows.includes(zone.zone_id)} 
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell className="font-medium">{zone.zone_id}</TableCell>
+                                                    <TableCell className="whitespace-normal">{zone.zone_name}</TableCell>
+                                                    <TableCell className="whitespace-normal">{zone.vidhan_name}</TableCell>
+                                                    <TableCell className="whitespace-normal">{zone.lok_name}</TableCell>
+                                                    <TableCell>{zone.state}</TableCell>
+                                                    <TableCell>{zone.range ? `${zone.range} km` : 'N/A'}</TableCell>
+                                                    <TableCell>{zone.limit || 'N/A'}</TableCell>
+                                                    <TableCell>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className={`font-medium ${isAtLimit ? 'text-red-600' : 'text-gray-700'}`}>
+                                                                {surveyFilled}
+                                                            </span>
+                                                            {surveyLimit > 0 && (
+                                                                <>
+                                                                    <span className="text-gray-400">/</span>
+                                                                    <span className="text-gray-600">{surveyLimit}</span>
+                                                                    <Badge 
+                                                                        variant="secondary" 
+                                                                        className={`text-xs ${
+                                                                            isAtLimit 
+                                                                                ? 'bg-red-100 text-red-700' 
+                                                                                : progressPercent >= 75 
+                                                                                ? 'bg-yellow-100 text-yellow-700'
+                                                                                : 'bg-green-100 text-green-700'
+                                                                        }`}
+                                                                    >
+                                                                        {progressPercent.toFixed(0)}%
+                                                                    </Badge>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="flex justify-center space-x-1">
+                                                            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => openModal('view', zone)}>
+                                                                <Eye className="h-4 w-4" />
+                                                            </Button>
+                                                            <Button size="icon" className="h-8 w-8 bg-cyan-500 hover:bg-cyan-600 text-white" onClick={() => openModal('edit', zone)}>
+                                                                <Pencil className="h-4 w-4" />
+                                                            </Button>
+                                                            <Button size="icon" className="h-8 w-8 bg-red-500 hover:bg-red-600 text-white" onClick={() => openModal('delete', zone)}>
+                                                                <X className="h-4 w-4" />
+                                                            </Button>
+                                                        </div>
+                                                    </TableCell>
+                                                </TableRow>
+                                            );
+                                        })
                                     )}
                                 </TableBody>
                             </Table>
                         </div>
                     </CardContent>
                     {/* Footer with Bulk Actions and Pagination */}
-                    <div className="px-6 py-4 flex flex-wrap gap-4 justify-between items-center">
+                    <div className="px-6 py-4 flex flex-wrap gap-4 justify-between items-center border-t">
                         <div>
                             {selectedRows.length > 0 && (
                                 <div className="flex items-center space-x-2">
                                      <span className="text-sm text-gray-600">{selectedRows.length} selected</span>
-                                     <Button variant="destructive" size="sm" onClick={handleBulkDelete}>
+                                     <Button 
+                                        variant="destructive" 
+                                        size="sm" 
+                                        className="bg-red-600 hover:bg-red-700" 
+                                        onClick={handleBulkDeleteClick}
+                                    >
                                         <Trash2 className="h-4 w-4 mr-2" />
                                         Delete Selected
                                      </Button>
@@ -476,9 +577,9 @@ const AllZones = () => {
                         </div>
                         <Pagination>
                             <PaginationContent>
-                                <PaginationItem className="pointer-events-none text-gray-400"><PaginationPrevious href="#" /></PaginationItem>
-                                <PaginationItem><PaginationLink href="#" isActive>{currentPage}</PaginationLink></PaginationItem>
-                                <PaginationItem className="pointer-events-none text-gray-400"><PaginationNext href="#" /></PaginationItem>
+                                <PaginationItem className="pointer-events-none text-gray-400"><PaginationPrevious /></PaginationItem>
+                                <PaginationItem><PaginationLink isActive>{currentPage}</PaginationLink></PaginationItem>
+                                <PaginationItem className="pointer-events-none text-gray-400"><PaginationNext /></PaginationItem>
                             </PaginationContent>
                         </Pagination>
                     </div>
@@ -487,32 +588,114 @@ const AllZones = () => {
 
             {/* View Modal */}
             <Dialog open={!!modalData.view} onOpenChange={() => closeModal('view')}>
-                <DialogContent>
+                <DialogContent className="sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle>View Booth (ID: {modalData.view?.zone_id})</DialogTitle>
                         <DialogDescription>
                             View detailed information for this booth record.
                         </DialogDescription>
                     </DialogHeader>
-                    {modalData.view && <div className="py-4 space-y-2 text-sm">
-                        <p><span className="font-semibold">Booth Name:</span> {modalData.view.zone_name}</p>
-                        <p><span className="font-semibold">Vidhan Sabha:</span> {modalData.view.vidhan_name}</p>
-                        <p><span className="font-semibold">Loksabha:</span> {modalData.view.lok_name}</p>
-                        <p><span className="font-semibold">State:</span> {modalData.view.state}</p>
-                        <p><span className="font-semibold">Latitude:</span> {modalData.view.lat || 'N/A'}</p>
-                        <p><span className="font-semibold">Longitude:</span> {modalData.view.lon || 'N/A'}</p>
-                    </div>}
+                    {modalData.view && (
+                        <div className="py-4 space-y-3 text-sm">
+                            <div className="grid grid-cols-2 gap-2">
+                                <span className="font-semibold text-gray-700">Booth Name:</span>
+                                <span className="text-gray-900">{modalData.view.zone_name}</span>
+                                
+                                <span className="font-semibold text-gray-700">Vidhan Sabha:</span>
+                                <span className="text-gray-900">{modalData.view.vidhan_name}</span>
+                                
+                                <span className="font-semibold text-gray-700">Loksabha:</span>
+                                <span className="text-gray-900">{modalData.view.lok_name}</span>
+                                
+                                <span className="font-semibold text-gray-700">State:</span>
+                                <span className="text-gray-900">{modalData.view.state}</span>
+                                
+                                <span className="font-semibold text-gray-700">Latitude:</span>
+                                <span className="text-gray-900">{modalData.view.lat || 'N/A'}</span>
+                                
+                                <span className="font-semibold text-gray-700">Longitude:</span>
+                                <span className="text-gray-900">{modalData.view.lon || 'N/A'}</span>
+                                
+                                <span className="font-semibold text-gray-700">Range:</span>
+                                <span className="text-gray-900">{modalData.view.range ? `${modalData.view.range} km` : 'N/A'}</span>
+                                
+                                <span className="font-semibold text-gray-700">Survey Limit:</span>
+                                <span className="text-gray-900">{modalData.view.limit || 'N/A'}</span>
+                                
+                                <span className="font-semibold text-gray-700">Surveys Filled:</span>
+                                <span className="text-gray-900">{modalData.view.surveyfilled || 0}</span>
+                            </div>
+
+                            {modalData.view.limit > 0 && (
+                                <div className="pt-3 border-t">
+                                    <div className="flex justify-between text-xs text-gray-600 mb-1">
+                                        <span>Progress</span>
+                                        <span>{((modalData.view.surveyfilled || 0) / modalData.view.limit * 100).toFixed(1)}%</span>
+                                    </div>
+                                    <div className="w-full bg-gray-200 rounded-full h-2">
+                                        <div 
+                                            className={`h-2 rounded-full ${
+                                                (modalData.view.surveyfilled || 0) >= modalData.view.limit 
+                                                    ? 'bg-red-500' 
+                                                    : ((modalData.view.surveyfilled || 0) / modalData.view.limit) >= 0.75
+                                                    ? 'bg-yellow-500'
+                                                    : 'bg-green-500'
+                                            }`}
+                                            style={{ width: `${Math.min(((modalData.view.surveyfilled || 0) / modalData.view.limit * 100), 100)}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
                     <DialogFooter><Button variant="outline" onClick={() => closeModal('view')}>Close</Button></DialogFooter>
                 </DialogContent>
             </Dialog>
 
             {/* Edit Modal */}
             <Dialog open={!!modalData.edit} onOpenChange={() => closeModal('edit')}>
-                 <DialogContent>
-                    <DialogHeader><DialogTitle>Edit Booth (ID: {modalData.edit?.zone_id})</DialogTitle><DialogDescription>Update the details for this Zone.</DialogDescription></DialogHeader>
+                 <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Edit Booth (ID: {modalData.edit?.zone_id})</DialogTitle>
+                        <DialogDescription>Update the details for this Zone.</DialogDescription>
+                    </DialogHeader>
                     <div className="py-4 space-y-4">
-                        <label className="block text-sm font-medium">Booth Name
-                          <Input className="mt-1" value={editFormData.zone_name} onChange={(e) => setEditFormData({...editFormData, zone_name: e.target.value})} disabled={isSubmitting}/>
+                        <label className="block text-sm font-medium">
+                            Booth Name
+                            <Input 
+                                className="mt-1" 
+                                value={editFormData.zone_name} 
+                                onChange={(e) => setEditFormData({...editFormData, zone_name: e.target.value})} 
+                                disabled={isSubmitting}
+                            />
+                        </label>
+                        
+                        <label className="block text-sm font-medium">
+                            Range (in kilometers)
+                            <Input 
+                                className="mt-1" 
+                                type="number"
+                                step="any"
+                                min="0"
+                                value={editFormData.range} 
+                                onChange={(e) => setEditFormData({...editFormData, range: e.target.value})} 
+                                disabled={isSubmitting}
+                                placeholder="Enter range in km"
+                            />
+                        </label>
+
+                        <label className="block text-sm font-medium">
+                            Survey per Booth
+                            <Input 
+                                className="mt-1" 
+                                type="number"
+                                step="1"
+                                min="0"
+                                value={editFormData.limit} 
+                                onChange={(e) => setEditFormData({...editFormData, limit: e.target.value})} 
+                                disabled={isSubmitting}
+                                placeholder="Enter survey limit"
+                            />
                         </label>
                     </div>
                     <DialogFooter>
@@ -525,7 +708,7 @@ const AllZones = () => {
                 </DialogContent>
             </Dialog>
 
-            {/* Delete Confirmation Modal */}
+            {/* Single Delete Confirmation Modal */}
             <Dialog open={!!modalData.delete} onOpenChange={() => closeModal('delete')}>
                 <DialogContent>
                     <DialogHeader><DialogTitle className="flex items-center"><Trash2 className="mr-2 text-red-500"/>Are you sure?</DialogTitle><DialogDescription>This will permanently delete the record for "{modalData.delete?.zone_name}". This action cannot be undone.</DialogDescription></DialogHeader>
@@ -534,6 +717,59 @@ const AllZones = () => {
                         <Button variant="destructive" onClick={confirmDelete} disabled={isSubmitting}>
                             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
                             Confirm Delete
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Bulk Delete Confirmation Modal */}
+            <Dialog open={!!modalData.bulkDelete} onOpenChange={() => closeModal('bulkDelete')}>
+                <DialogContent className="sm:max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center">
+                            <Trash2 className="mr-2 text-red-600"/>
+                            Delete Multiple Zones
+                        </DialogTitle>
+                        <DialogDescription>
+                            This action cannot be undone. This will permanently delete {modalData.bulkDelete?.length} zone(s).
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="max-h-[400px] overflow-y-auto py-4">
+                        <h4 className="font-semibold mb-3 text-gray-700">Zones to be deleted:</h4>
+                        <ul className="space-y-2">
+                            {modalData.bulkDelete?.map((zone, index) => (
+                                <li key={zone.zone_id} className="flex items-start gap-2 p-3 bg-slate-50 rounded-md border border-slate-200">
+                                    <span className="font-medium text-gray-600 min-w-[30px]">{index + 1}.</span>
+                                    <div className="flex-grow">
+                                        <p className="text-sm font-medium text-gray-800">{zone.zone_name}</p>
+                                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                            <Badge variant="secondary" className="bg-green-100 text-green-800 border-0 text-xs">
+                                                {zone.vidhan_name}
+                                            </Badge>
+                                            <Badge variant="secondary" className="bg-purple-100 text-purple-800 border-0 text-xs">
+                                                {zone.lok_name}
+                                            </Badge>
+                                            <Badge variant="secondary" className="bg-orange-100 text-orange-800 border-0 text-xs">
+                                                {zone.state}
+                                            </Badge>
+                                            <span className="text-xs text-gray-500">ID: {zone.zone_id}</span>
+                                        </div>
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => closeModal('bulkDelete')} disabled={isBulkDeleting}>
+                            Cancel
+                        </Button>
+                        <Button 
+                            className="bg-red-600 text-white hover:bg-red-700" 
+                            onClick={confirmBulkDelete}
+                            disabled={isBulkDeleting}
+                        >
+                            {isBulkDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            {isBulkDeleting ? 'Deleting...' : `Delete ${modalData.bulkDelete?.length} Zone(s)`}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

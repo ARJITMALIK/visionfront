@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Home, ChevronRight, CheckCircle2, AlertTriangle, Edit, Trash2, X, Plus, ChevronLeft, Eye, Sparkles, Grid3X3, Activity } from 'lucide-react';
 import { VisionBase } from '@/utils/axiosInstance';
+import { useNavigate } from 'react-router-dom';
 
 // ===================================================================================
 // MODERN UI COMPONENTS (Unchanged from original)
@@ -121,10 +122,9 @@ const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
 };
 
 // ===================================================================================
-// HELPER FUNCTION (New)
+// HELPER FUNCTION
 // ===================================================================================
 
-// Helper to convert a file to a Base64 data URL string
 const toBase64 = file => new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -132,42 +132,35 @@ const toBase64 = file => new Promise((resolve, reject) => {
     reader.onerror = reject;
 });
 
-
 // ===================================================================================
-// MAIN AllEmoji COMPONENT
+// MAIN AllEmoji COMPONENT (WITH BULK DELETE VIA /delete-emojis)
 // ===================================================================================
 
 const AllEmoji = () => {
-    // Mock navigation function for demo purposes
-    const navigate = (path) => {
-        console.log(`Would navigate to: ${path}`);
-        alert(`Navigation to ${path} - In a real app, this would use React Router`);
-    };
+    const navigate = useNavigate();
 
-    // State
     const [emojis, setEmojis] = useState([]);
     const [selectedEmojiIds, setSelectedEmojiIds] = useState([]);
     const [currentPage, setCurrentPage] = useState(1);
     const [modalState, setModalState] = useState({ type: null, data: null });
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [isSubmitting, setIsSubmitting] = useState(false); // For modals
 
     const ITEMS_PER_PAGE = 10;
     
-    // API Call to fetch emojis
     const fetchEmojis = async () => {
         setIsLoading(true);
         setError(null);
         try {
             const response = await VisionBase.get('/emojis');
-            // Map API response to the format used by the UI
             const formattedData = response.data.data.rows.map(item => ({
                 id: item.emoji_id,
                 title: item.title,
                 emojiUrl: item.img,
                 status: item.status ? 'Active' : 'Inactive',
             }));
-            setEmojis(formattedData.sort((a, b) => b.id - a.id)); // Sort by ID descending
+            setEmojis(formattedData.sort((a, b) => b.id - a.id));
         } catch (err) {
             console.error("Failed to fetch emojis:", err);
             setError("Could not load emojis. Please try again later.");
@@ -176,12 +169,10 @@ const AllEmoji = () => {
         }
     };
 
-    // Fetch data on component mount
     useEffect(() => {
         fetchEmojis();
     }, []);
 
-    // Derived State
     const stats = useMemo(() => ({
         total: emojis.length,
         active: emojis.filter(u => u.status === 'Active').length,
@@ -195,7 +186,6 @@ const AllEmoji = () => {
 
     const totalPages = Math.ceil(emojis.length / ITEMS_PER_PAGE);
 
-    // Handlers
     const handleSelectAll = (e) => setSelectedEmojiIds(e.target.checked ? paginatedEmojis.map(e => e.id) : []);
     const handleSelectOne = (id) => setSelectedEmojiIds(prev => prev.includes(id) ? prev.filter(emojiId => emojiId !== id) : [...prev, id]);
     
@@ -205,11 +195,9 @@ const AllEmoji = () => {
     const handleEdit = (emoji) => setModalState({ type: 'edit', data: emoji });
     const handleDelete = (emoji) => setModalState({ type: 'delete', data: emoji });
     
-    // API-related Handlers
-    // --- MODIFICATION START ---
     const handleUpdateSubmit = async (e, emojiId) => {
         e.preventDefault();
-        setIsLoading(true);
+        setIsSubmitting(true);
         setError(null);
 
         const formElements = e.target.elements;
@@ -219,12 +207,10 @@ const AllEmoji = () => {
         const originalEmoji = modalState.data;
         const payload = {};
 
-        // Check if title was updated
         if (updatedTitle && updatedTitle !== originalEmoji.title) {
             payload.title = updatedTitle;
         }
         
-        // Check if a new image was uploaded and convert it to Base64
         if (imageFile) {
             try {
                 const base64Image = await toBase64(imageFile);
@@ -232,59 +218,66 @@ const AllEmoji = () => {
             } catch (error) {
                 console.error("Error converting file to Base64:", error);
                 setError("Failed to process the uploaded image.");
-                setIsLoading(false);
+                setIsSubmitting(false);
                 return;
             }
         }
         
-        // Only submit if there are actual changes
         if (Object.keys(payload).length === 0) {
             closeModal();
-            setIsLoading(false);
+            setIsSubmitting(false);
             return;
         }
         
         try {
-            // Send only the updated fields as a JSON payload
             await VisionBase.put(`/emoji/${emojiId}`, payload);
             closeModal();
-            await fetchEmojis(); // Re-fetch to see the changes
+            await fetchEmojis();
         } catch (err) {
             console.error("Failed to update emoji:", err);
             setError("An error occurred while updating the emoji.");
         } finally {
-            setIsLoading(false);
+            setIsSubmitting(false);
         }
     };
-    // --- MODIFICATION END ---
 
     const handleDeleteConfirm = async (emojiId) => {
         setIsLoading(true);
         try {
             await VisionBase.delete(`/emoji/${emojiId}`);
-            // Optimistically update UI
             setEmojis(prev => prev.filter(em => em.id !== emojiId));
             setSelectedEmojiIds(prev => prev.filter(id => id !== emojiId));
             closeModal();
         } catch (err) {
             console.error(`Failed to delete emoji #${emojiId}:`, err);
+            setError("Failed to delete emoji.");
         } finally {
             setIsLoading(false);
         }
     };
 
-    const handleBulkDelete = async () => {
+    // ✅ UPDATED BULK DELETE: Uses /delete-emojis endpoint with { ids: [...] } in body
+    const handleBulkDelete = () => {
+        if (selectedEmojiIds.length > 0) {
+            setModalState({ type: 'delete-emojis' });
+        }
+    };
+
+    const handleBulkDeleteConfirm = async () => {
+        if (selectedEmojiIds.length === 0) return;
         setIsLoading(true);
         try {
-            // Send multiple delete requests concurrently
-            const deletePromises = selectedEmojiIds.map(id => VisionBase.delete(`/emoji/${id}`));
-            await Promise.all(deletePromises);
-            
+            // Send selected IDs in the body of DELETE request
+            await VisionBase.delete('/delete-emojis', { 
+                data: { ids: selectedEmojiIds } 
+            });
             // Optimistically update UI
             setEmojis(prev => prev.filter(em => !selectedEmojiIds.includes(em.id)));
             setSelectedEmojiIds([]);
+            closeModal();
         } catch (err) {
             console.error("Failed to bulk delete emojis:", err);
+            setError(err.response?.data?.message || "An error occurred while deleting emojis.");
         } finally {
             setIsLoading(false);
         }
@@ -292,7 +285,6 @@ const AllEmoji = () => {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-violet-50 via-purple-50 to-pink-50 p-4 sm:p-6 lg:p-8 font-sans">
-            {/* Header */}
             <header className="mb-8">
                 <div className="flex items-center justify-between">
                     <div>
@@ -317,14 +309,12 @@ const AllEmoji = () => {
                 </nav>
             </header>
 
-            {/* Stats Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
                 <StatCard icon={Grid3X3} title="Total Emojis" value={stats.total} gradient="from-blue-500 to-blue-600" />
                 <StatCard icon={CheckCircle2} title="Active" value={stats.active} gradient="from-emerald-500 to-emerald-600" />
                 <StatCard icon={AlertTriangle} title="Inactive" value={stats.inactive} gradient="from-orange-500 to-orange-600" />
             </div>
 
-            {/* Main Table Card */}
             <div className="bg-white/70 backdrop-blur-sm border border-white/20 shadow-xl rounded-2xl overflow-hidden">
                 <div className="px-6 py-4 bg-gradient-to-r from-violet-50 to-purple-50 border-b border-violet-100/50 flex justify-between items-center">
                     <div>
@@ -380,18 +370,18 @@ const AllEmoji = () => {
                 </div>
             </div>
 
-            {/* Bulk Actions Bar */}
+            {/* Bulk Action Button (now opens confirmation modal) */}
             {selectedEmojiIds.length > 0 && (
                 <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-red-500 to-red-600 text-white px-6 py-4 rounded-2xl shadow-2xl backdrop-blur-sm border border-red-400/20 animate-in slide-in-from-bottom-4 duration-300">
                     <div className="flex items-center space-x-4">
                         <span className="text-sm font-medium">{selectedEmojiIds.length} emoji{selectedEmojiIds.length !== 1 ? 's' : ''} selected</span>
-                        <button onClick={handleBulkDelete} disabled={isLoading} className="px-4 py-2 bg-red-700 hover:bg-red-800 rounded-xl text-sm font-medium transition-all disabled:opacity-50">{isLoading ? 'Deleting...' : 'Delete Selected'}</button>
+                        <button onClick={handleBulkDelete} className="px-4 py-2 bg-red-700 hover:bg-red-800 rounded-xl text-sm font-medium transition-all">Delete Selected</button>
                         <button onClick={() => setSelectedEmojiIds([])} className="p-2 hover:bg-red-600 rounded-xl transition-all"><X className="h-4 w-4"/></button>
                     </div>
                 </div>
             )}
 
-            {/* Modals */}
+            {/* View Modal */}
             <Modal isOpen={modalState.type === 'view'} onClose={closeModal} title="Emoji Details" size="md">
                 {modalState.data && (
                     <div className="text-center space-y-6">
@@ -405,6 +395,7 @@ const AllEmoji = () => {
                 )}
             </Modal>
             
+            {/* Edit Modal */}
             <Modal isOpen={modalState.type === 'edit'} onClose={closeModal} title="Edit Emoji" size="lg">
                 {modalState.data && (
                     <form onSubmit={(e) => handleUpdateSubmit(e, modalState.data.id)}>
@@ -429,13 +420,14 @@ const AllEmoji = () => {
                             </div>
                             <div className="flex justify-end space-x-3 pt-4">
                                 <button type="button" onClick={closeModal} className="px-6 py-3 text-sm font-medium text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-all">Cancel</button>
-                                <button type="submit" disabled={isLoading} className="px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-violet-500 to-purple-500 rounded-xl shadow-lg hover:shadow-xl hover:from-violet-600 hover:to-purple-600 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed transition-all duration-200">{isLoading ? 'Saving...' : 'Save Changes'}</button>
+                                <button type="submit" disabled={isSubmitting} className="px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-violet-500 to-purple-500 rounded-xl shadow-lg hover:shadow-xl hover:from-violet-600 hover:to-purple-600 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed transition-all duration-200">{isSubmitting ? 'Saving...' : 'Save Changes'}</button>
                             </div>
                         </div>
                     </form>
                 )}
             </Modal>
             
+            {/* Single Delete Modal */}
             <Modal isOpen={modalState.type === 'delete'} onClose={closeModal} title="Confirm Deletion" size="sm">
                 {modalState.data && (
                     <div className="text-center space-y-6">
@@ -450,6 +442,39 @@ const AllEmoji = () => {
                         </div>
                     </div>
                 )}
+            </Modal>
+
+            {/* ✅ NEW: Bulk Delete Confirmation Modal */}
+            <Modal isOpen={modalState.type === 'delete-emojis'} onClose={closeModal} title="Confirm Bulk Deletion" size="md">
+                <div className="py-4">
+                    <p className="text-gray-700 mb-4">
+                        Are you sure you want to delete <span className="font-bold text-red-600">{selectedEmojiIds.length} emoji(s)</span>?
+                        This action cannot be undone.
+                    </p>
+                    <div className="flex justify-end space-x-3">
+                        <button
+                            type="button"
+                            onClick={closeModal}
+                            className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={handleBulkDeleteConfirm}
+                            disabled={isLoading}
+                            className="px-6 py-2 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center space-x-2"
+                        >
+                            {isLoading ? (
+                                <>
+                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                    <span>Deleting...</span>
+                                </>
+                            ) : (
+                                <span>Delete Emojis</span>
+                            )}
+                        </button>
+                    </div>
+                </div>
             </Modal>
         </div>
     );

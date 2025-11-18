@@ -1,8 +1,7 @@
 import { VisionBase } from '@/utils/axiosInstance';
 import React, { useState, useMemo, useEffect } from 'react';
-// In a real application, you would install and import react-router-dom
-// npm install react-router-dom
 import { useNavigate } from 'react-router-dom';
+import { toast, Toaster } from 'sonner';
 
 // --- Start of Mocked Icons (No changes needed) ---
 const Home = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>;
@@ -18,6 +17,7 @@ const RefreshCw = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" 
 const Eye = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>;
 const Filter = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>;
 const RotateCcw = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 4v6h6"></path><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>;
+const Trash2 = (props) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>;
 // --- End of Mocked Icons ---
 
 // --- Start of Mocked UI Components (No changes needed) ---
@@ -57,6 +57,77 @@ const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, message, recordN
                         {isLoading ? (<div className="flex items-center"><RefreshCw className="w-4 h-4 mr-2 animate-spin" />Deleting...</div>) : 'Delete'}
                     </button>
                     <button onClick={onClose} disabled={isLoading} type="button" className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors">Cancel</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const BulkDeleteModal = ({ isOpen, onClose, onConfirm, records, isLoading }) => {
+    if (!isOpen || !records || records.length === 0) return null;
+    
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
+                <div className="p-6 border-b">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                            <Trash2 className="w-6 h-6 text-red-500 mr-3" />
+                            <h3 className="text-lg font-bold text-gray-900">Delete Multiple Loksabhas</h3>
+                        </div>
+                        <button onClick={onClose} disabled={isLoading} className="text-gray-400 hover:text-gray-600">
+                            <X className="w-6 h-6" />
+                        </button>
+                    </div>
+                    <p className="text-sm text-gray-600 mt-2">
+                        This action cannot be undone. This will permanently delete {records.length} Loksabha record(s).
+                    </p>
+                </div>
+                
+                <div className="p-6 max-h-[400px] overflow-y-auto">
+                    <h4 className="font-semibold mb-3 text-gray-700">Loksabhas to be deleted:</h4>
+                    <ul className="space-y-2">
+                        {records.map((record, index) => (
+                            <li key={record.lok_id} className="flex items-start gap-2 p-3 bg-slate-50 rounded-md border border-slate-200">
+                                <span className="font-medium text-gray-600 min-w-[30px]">{index + 1}.</span>
+                                <div className="flex-grow">
+                                    <p className="text-sm font-medium text-gray-800">{record.lok_name}</p>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-full">
+                                            {record.state}
+                                        </span>
+                                        <span className="text-xs text-gray-500">ID: {record.lok_id}</span>
+                                    </div>
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+                
+                <div className="bg-gray-50 px-6 py-4 flex justify-end space-x-3 rounded-b-lg">
+                    <button 
+                        onClick={onClose} 
+                        disabled={isLoading} 
+                        type="button" 
+                        className="inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                        Cancel
+                    </button>
+                    <button 
+                        onClick={onConfirm} 
+                        disabled={isLoading} 
+                        type="button" 
+                        className="inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                        {isLoading ? (
+                            <div className="flex items-center">
+                                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                                Deleting...
+                            </div>
+                        ) : (
+                            `Delete ${records.length} Record(s)`
+                        )}
+                    </button>
                 </div>
             </div>
         </div>
@@ -158,13 +229,16 @@ const AllLoksabha = () => {
     const [loksabhaData, setLoksabhaData] = useState([]);
     const [selectedRows, setSelectedRows] = useState([]);
     const [isDeleteModalOpen, setDeleteModalOpen] = useState(false);
+    const [isBulkDeleteModalOpen, setBulkDeleteModalOpen] = useState(false);
     const [isViewModalOpen, setViewModalOpen] = useState(false);
     const [isEditModalOpen, setEditModalOpen] = useState(false);
     const [recordToDelete, setRecordToDelete] = useState(null);
+    const [recordsToDelete, setRecordsToDelete] = useState([]);
     const [recordToView, setRecordToView] = useState(null);
     const [recordToEdit, setRecordToEdit] = useState(null);
     const [loading, setLoading] = useState(true);
     const [deleteLoading, setDeleteLoading] = useState(false);
+    const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
     const [updateLoading, setUpdateLoading] = useState(false);
     const [error, setError] = useState(null);
 
@@ -189,6 +263,7 @@ const AllLoksabha = () => {
         } catch (err) {
             console.error('Error fetching Loksabha data:', err);
             setError('Failed to fetch Loksabha data. Please try again.');
+            toast.error('Failed to fetch Loksabha data');
             setLoksabhaData([]);
         } finally {
             setLoading(false);
@@ -214,7 +289,8 @@ const AllLoksabha = () => {
         if (searchTerm) {
             filtered = filtered.filter(item =>
                 item.lok_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                item.state?.toLowerCase().includes(searchTerm.toLowerCase())
+                item.state?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                item.lok_id?.toString().includes(searchTerm)
             );
         }
 
@@ -230,19 +306,19 @@ const AllLoksabha = () => {
     const resetFilters = () => {
         setSearchTerm('');
         setFilters({ state: '' });
-        setSelectedRows([]); // Clear selections when resetting filters
+        setSelectedRows([]);
     };
 
     // Update filter
     const updateFilter = (key, value) => {
         setFilters(prev => ({ ...prev, [key]: value }));
-        setSelectedRows([]); // Clear selections when changing filters
+        setSelectedRows([]);
     };
 
     const counts = useMemo(() => ({
         total: loksabhaData.length,
         filtered: filteredLoksabhaData.length,
-        active: loksabhaData.length, // Assuming all are active
+        active: loksabhaData.length,
         inactive: 0,
     }), [loksabhaData, filteredLoksabhaData]);
 
@@ -271,89 +347,80 @@ const AllLoksabha = () => {
         }
     };
 
-    // --- START OF FIX: Corrected single record delete function ---
     const handleDeleteConfirm = async () => {
         if (!recordToDelete) return;
         setDeleteLoading(true);
         try {
-            // Make the actual API call to delete the record from the backend.
-            // The endpoint '/lok/{id}' is inferred from other functions in the component.
             await VisionBase.delete(`/lok/${recordToDelete.lok_id}`);
 
-            // After a successful API call, update the local state to reflect the change.
-            // This is an "optimistic update" because we assume success.
             setLoksabhaData(prev => prev.filter(item => item.lok_id !== recordToDelete.lok_id));
             setSelectedRows(prev => prev.filter(id => id !== recordToDelete.lok_id));
             
-            alert(`Successfully deleted Loksabha: ${recordToDelete.lok_name}`);
+            toast.success(`Successfully deleted Loksabha: ${recordToDelete.lok_name}`);
         } catch (err) {
             console.error("Error deleting record:", err);
-            // Provide more specific feedback to the user on failure.
-            alert(`Failed to delete record: ${err.response?.data?.message || err.message || 'Unknown error'}`);
-            // Since the optimistic update didn't happen on failure, no state rollback is needed here.
+            toast.error(err.response?.data?.message || 'Failed to delete record');
         } finally {
             setDeleteLoading(false);
             setDeleteModalOpen(false);
             setRecordToDelete(null);
         }
     };
-    // --- END OF FIX ---
     
     const handleUpdateConfirm = async (updatedData) => {
         if (!recordToEdit) return;
         setUpdateLoading(true);
         try {
-            // Example:
             await VisionBase.put(`/lok/${recordToEdit.lok_id}`, updatedData);
 
             setLoksabhaData(prev => prev.map(item => 
                 item.lok_id === recordToEdit.lok_id ? { ...item, ...updatedData } : item
             ));
-            alert(`Successfully updated Loksabha: ${updatedData.lok_name}`);
+            toast.success(`Successfully updated Loksabha: ${updatedData.lok_name}`);
             setEditModalOpen(false);
             setRecordToEdit(null);
         } catch (err) {
             console.error("Error updating record:", err);
-            alert(`Failed to update record: ${err.message || 'Unknown error'}`);
+            toast.error(err.response?.data?.message || 'Failed to update record');
         } finally {
             setUpdateLoading(false);
         }
     };
 
-    // --- START OF FIX: Corrected bulk delete function ---
-    const handleBulkDelete = async () => {
-        const numToDelete = selectedRows.length;
-        if (numToDelete === 0) {
-            alert("Please select at least one record to delete.");
+    const handleBulkDeleteClick = () => {
+        if (selectedRows.length === 0) {
+            toast.error("Please select at least one record to delete.");
             return;
         }
-        if (!window.confirm(`Are you sure you want to delete ${numToDelete} record(s)?`)) {
-            return;
-        }
-
-        // Keep a copy of original data for rollback in case of failure.
-        const originalData = [...loksabhaData];
-        const originalSelectedRows = [...selectedRows];
-
-        // Optimistic UI update: Remove items from view immediately.
-        setLoksabhaData(prev => prev.filter(item => !originalSelectedRows.includes(item.lok_id)));
-        setSelectedRows([]);
         
-        try {
-            // Correctly iterate over the selected row IDs and call the delete API for each.
-            // A single bulk delete endpoint would be more efficient, but this works.
-            await Promise.all(originalSelectedRows.map(id => VisionBase.delete(`/lok/${id}`)));
+        const recordsToDeleteData = loksabhaData.filter(item => selectedRows.includes(item.lok_id));
+        setRecordsToDelete(recordsToDeleteData);
+        setBulkDeleteModalOpen(true);
+    };
 
-            alert(`Successfully deleted ${numToDelete} record(s).`);
+    const handleBulkDeleteConfirm = async () => {
+        if (recordsToDelete.length === 0) return;
+        
+        setBulkDeleteLoading(true);
+        try {
+            const idsToDelete = recordsToDelete.map(record => record.lok_id);
+            
+            await VisionBase.delete('/delete-loksabhas', {
+                data: { ids: idsToDelete }
+            });
+
+            setLoksabhaData(prev => prev.filter(item => !idsToDelete.includes(item.lok_id)));
+            setSelectedRows([]);
+            toast.success(`Successfully deleted ${idsToDelete.length} Loksabha record(s).`);
+            setBulkDeleteModalOpen(false);
+            setRecordsToDelete([]);
         } catch (err) {
             console.error("Error in bulk delete:", err);
-            alert(`Failed to delete one or more records. Reverting changes.`);
-            // Rollback on failure: restore the previous state.
-            setLoksabhaData(originalData);
-            setSelectedRows(originalSelectedRows); // Also restore selection for user convenience.
+            toast.error(err.response?.data?.message || "Failed to delete records. Please try again.");
+        } finally {
+            setBulkDeleteLoading(false);
         }
     };
-    // --- END OF FIX ---
 
     if (loading) {
         return (
@@ -382,6 +449,7 @@ const AllLoksabha = () => {
     
     return (
         <div className="min-h-screen bg-[#FEFBFB] p-4 sm:p-6 lg:p-8 font-sans">
+            <Toaster richColors position="top-right" />
             <div className="max-w-7xl mx-auto">
                 <header className="flex justify-between items-center mb-4">
                     <h1 className="text-2xl sm:text-3xl text-[#5a5a5a]">
@@ -426,12 +494,17 @@ const AllLoksabha = () => {
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                             <input
                                 type="text"
-                                placeholder="Search loksabha name or state..."
+                                placeholder="Search by ID, name, or state..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 className="pl-10 w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#EE4B4B] focus:border-[#EE4B4B] sm:text-sm"
                             />
                         </div>
+                        {searchTerm && (
+                            <p className="text-sm text-gray-600">
+                                Found {filteredLoksabhaData.length} result(s) for "{searchTerm}"
+                            </p>
+                        )}
 
                         {/* Filter Dropdowns */}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -517,7 +590,7 @@ const AllLoksabha = () => {
                                                     <input type="checkbox" onChange={() => handleSelectRow(item.lok_id)} checked={selectedRows.includes(item.lok_id)} className="w-4 h-4 text-red-600 bg-gray-100 border-gray-300 rounded focus:ring-red-500"/>
                                                 </td>
                                                 <td className="px-6 py-4 font-medium text-gray-900">{item.lok_id}</td>
-                                                <td className="px-6 py-4">{item.lok_name}</td>
+                                                <td className="px-6 py-4 whitespace-normal">{item.lok_name}</td>
                                                 <td className="px-6 py-4">{item.state}</td>
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center justify-center space-x-1">
@@ -538,8 +611,12 @@ const AllLoksabha = () => {
                             {selectedRows.length > 0 && (
                                 <div className="flex items-center space-x-4">
                                     <span className="text-sm text-gray-600">{selectedRows.length} selected</span>
-                                    <button onClick={handleBulkDelete} className="flex items-center px-3 py-1.5 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" title="Delete Selected">
-                                        <X className="w-4 h-4 mr-1" /> Delete Selected
+                                    <button 
+                                        onClick={handleBulkDeleteClick} 
+                                        className="flex items-center px-3 py-1.5 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" 
+                                        title="Delete Selected"
+                                    >
+                                        <Trash2 className="w-4 h-4 mr-1" /> Delete Selected
                                     </button>
                                 </div>
                             )}
@@ -555,9 +632,37 @@ const AllLoksabha = () => {
                 </Card>
             </div>
             
-            <ConfirmationModal isOpen={isDeleteModalOpen} onClose={() => { setDeleteModalOpen(false); setRecordToDelete(null); }} onConfirm={handleDeleteConfirm} title="Delete Loksabha Record" message="Are you sure you want to delete" recordName={recordToDelete?.lok_name} isLoading={deleteLoading}/>
-            <ViewModal isOpen={isViewModalOpen} onClose={() => { setViewModalOpen(false); setRecordToView(null); }} record={recordToView} />
-            <EditModal isOpen={isEditModalOpen} onClose={() => { setEditModalOpen(false); setRecordToEdit(null); }} onConfirm={handleUpdateConfirm} record={recordToEdit} isLoading={updateLoading}/>
+            <ConfirmationModal 
+                isOpen={isDeleteModalOpen} 
+                onClose={() => { setDeleteModalOpen(false); setRecordToDelete(null); }} 
+                onConfirm={handleDeleteConfirm} 
+                title="Delete Loksabha Record" 
+                message="Are you sure you want to delete" 
+                recordName={recordToDelete?.lok_name} 
+                isLoading={deleteLoading}
+            />
+            
+            <BulkDeleteModal 
+                isOpen={isBulkDeleteModalOpen}
+                onClose={() => { setBulkDeleteModalOpen(false); setRecordsToDelete([]); }}
+                onConfirm={handleBulkDeleteConfirm}
+                records={recordsToDelete}
+                isLoading={bulkDeleteLoading}
+            />
+            
+            <ViewModal 
+                isOpen={isViewModalOpen} 
+                onClose={() => { setViewModalOpen(false); setRecordToView(null); }} 
+                record={recordToView} 
+            />
+            
+            <EditModal 
+                isOpen={isEditModalOpen} 
+                onClose={() => { setEditModalOpen(false); setRecordToEdit(null); }} 
+                onConfirm={handleUpdateConfirm} 
+                record={recordToEdit} 
+                isLoading={updateLoading}
+            />
         </div>
     );
 };

@@ -28,7 +28,6 @@ import AllParty from './Pages/Party/AllParty';
 import AddCandidates from './Pages/Candidates/AddCandidates';
 import AllCandidates from './Pages/Candidates/AllCandidates';
 import AddNotification from './Pages/Notification/AddNotification';
-import AllNotifications from './Pages/Notification/AllNotifications';
 import AddDistricts from './Pages/Districts/AddDistricts';
 import AllDistricts from './Pages/Districts/AllDistricts';
 import AddLoksabha from './Pages/Loksabha/AddLoksabha';
@@ -70,8 +69,7 @@ const App = () => {
                 <Route path="/allparty" element={<AllParty />} />
                 <Route path="/addcandidates" element={<AddCandidates />} />
                 <Route path="/allcandidates" element={<AllCandidates />} />
-                <Route path="/addnotification" element={<AddNotification />} />
-                <Route path="/allnotifications" element={<AllNotifications />} />
+                <Route path="/notification" element={<AddNotification />} />
                 <Route path="/add-vidhan" element={<AddDistricts />} />
                 <Route path="/all-vidhan" element={<AllDistricts />} />
                 <Route path="/addloksabha" element={<AddLoksabha />} />

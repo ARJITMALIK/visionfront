@@ -102,7 +102,7 @@ const AddDistricts = () => {
     
     // Updated to navigate to the correct list page
     const handleBack = () => {
-        navigate('/allvidhansabhas');
+        navigate('/all-vidhan');
     };
 
     return (

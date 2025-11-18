@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Home, 
   ChevronRight, 
@@ -10,35 +10,22 @@ import {
   Trash2, 
   X, 
   Plus,
-  Bold,
-  Italic,
-  Underline,
-  List,
-  ListOrdered,
-  AlignLeft,
-  AlignCenter,
-  AlignRight,
-  Eye,
   Calendar,
   Vote,
-  Users,
   Activity,
   Sparkles,
   ChevronLeft,
-  MoreHorizontal,
   Trophy,
-  Clock
+  Clock,
+  Eye
 } from 'lucide-react';
 import { VisionBase } from '@/utils/axiosInstance';
+import { useNavigate } from 'react-router-dom';
 
 // ===================================================================================
-// DUMMY DATA & API SIMULATION (REMOVED)
-// All data operations are now handled via axios API calls.
+// UI Components (Simplified)
 // ===================================================================================
 
-// ===================================================================================
-// MODERN UI COMPONENTS (Unchanged)
-// ===================================================================================
 const StatCard = ({ icon: Icon, title, value, gradient, description }) => (
     <div className={`relative overflow-hidden bg-gradient-to-br ${gradient} p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 group cursor-pointer`}>
         <div className="relative z-10">
@@ -161,66 +148,39 @@ const Modal = ({ isOpen, onClose, title, children, size = 'md' }) => {
     );
 };
 
-const RichTextEditor = ({ content, onChange, height = 200 }) => {
-    const editorRef = useRef(null);
-    const executeCommand = (command, value = null) => { document.execCommand(command, false, value); editorRef.current?.focus(); handleEditorChange(); };
-    const handleEditorChange = () => { if (editorRef.current && onChange) { onChange(editorRef.current.innerHTML); } };
-    useEffect(() => { if (editorRef.current && content !== editorRef.current.innerHTML) { editorRef.current.innerHTML = content || ''; } }, [content]);
-    return (
-        <div className="border border-gray-200 rounded-xl overflow-hidden bg-white/70 backdrop-blur-sm shadow-sm">
-            <div className="flex items-center gap-1 p-3 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100">
-                <button type="button" onClick={() => executeCommand('bold')} className="p-2 hover:bg-white rounded-lg transition-all text-gray-600 hover:text-gray-800" title="Bold"><Bold className="w-4 h-4" /></button>
-                <button type="button" onClick={() => executeCommand('italic')} className="p-2 hover:bg-white rounded-lg transition-all text-gray-600 hover:text-gray-800" title="Italic"><Italic className="w-4 h-4" /></button>
-                <button type="button" onClick={() => executeCommand('underline')} className="p-2 hover:bg-white rounded-lg transition-all text-gray-600 hover:text-gray-800" title="Underline"><Underline className="w-4 h-4" /></button>
-                <div className="w-px h-6 bg-gray-300 mx-2"></div>
-                <button type="button" onClick={() => executeCommand('insertUnorderedList')} className="p-2 hover:bg-white rounded-lg transition-all text-gray-600 hover:text-gray-800" title="Bullet List"><List className="w-4 h-4" /></button>
-                <button type="button" onClick={() => executeCommand('insertOrderedList')} className="p-2 hover:bg-white rounded-lg transition-all text-gray-600 hover:text-gray-800" title="Numbered List"><ListOrdered className="w-4 h-4" /></button>
-                <div className="w-px h-6 bg-gray-300 mx-2"></div>
-                <button type="button" onClick={() => executeCommand('justifyLeft')} className="p-2 hover:bg-white rounded-lg transition-all text-gray-600 hover:text-gray-800" title="Align Left"><AlignLeft className="w-4 h-4" /></button>
-                <button type="button" onClick={() => executeCommand('justifyCenter')} className="p-2 hover:bg-white rounded-lg transition-all text-gray-600 hover:text-gray-800" title="Align Center"><AlignCenter className="w-4 h-4" /></button>
-                <button type="button" onClick={() => executeCommand('justifyRight')} className="p-2 hover:bg-white rounded-lg transition-all text-gray-600 hover:text-gray-800" title="Align Right"><AlignRight className="w-4 h-4" /></button>
-            </div>
-            <div ref={editorRef} contentEditable onInput={handleEditorChange} className="p-4 focus:outline-none focus:ring-2 focus:ring-violet-400 bg-white rounded-b-xl" style={{ minHeight: `${height}px`, maxHeight: `${height * 2}px`, overflowY: 'auto', lineHeight: '1.6' }} dangerouslySetInnerHTML={{ __html: content || '' }} />
-        </div>
-    );
-};
-
 // ===================================================================================
-// MAIN AllElections COMPONENT
+// MAIN AllElections COMPONENT (WITH TEXTAREA)
 // ===================================================================================
 
 const AllElections = () => {
-    // Mock navigation function for demo purposes
-    const navigate = (path) => {
-        console.log(`Would navigate to: ${path}`);
-        alert(`Navigation to ${path} - In a real app, this would use React Router`);
-    };
+  const navigate = useNavigate();
 
     const [elections, setElections] = useState([]);
     const [selectedIds, setSelectedIds] = useState([]);
     const [currentPage, setCurrentPage] = useState(1);
     const [modalState, setModalState] = useState({ type: null, data: null, originalData: null });
-    const [isLoading, setIsLoading] = useState(false); // For actions like save, delete
-    const [isFetching, setIsFetching] = useState(true); // For initial table data load
-    
-    // Fetch data on component mount
+    const [isLoading, setIsLoading] = useState(false);
+    const [isFetching, setIsFetching] = useState(true);
+    const [error, setError] = useState(null);
+
     useEffect(() => {
         const fetchElections = async () => {
             setIsFetching(true);
+            setError(null);
             try {
                 const response = await VisionBase.get('/elections');
                 const mappedData = response.data.data.rows.map(e => ({
                     id: e.election_id,
                     name: e.election_name,
                     date: e.election_date,
-                    description: e.election_desc,
+                    description: e.election_desc || '',
                     state: e.state,
-                    status: e.status,
+                    status: e.status ? 'Active' : 'Inactive',
                 }));
                 setElections(mappedData);
             } catch (error) {
                 console.error("Failed to fetch elections:", error);
-                // In a real app, you might set an error state to show a toast or message
+                setError("Failed to load elections. Please try again.");
             } finally {
                 setIsFetching(false);
             }
@@ -246,25 +206,42 @@ const AllElections = () => {
     const handleSelectAll = (e) => setSelectedIds(e.target.checked ? paginatedElections.map(el => el.id) : []);
     const handleSelectOne = (id) => setSelectedIds(prev => prev.includes(id) ? prev.filter(elId => elId !== id) : [...prev, id]);
     
-    const closeModal = () => setModalState({ type: null, data: null, originalData: null });
+    const closeModal = () => {
+        setError(null);
+        setModalState({ type: null, data: null, originalData: null });
+    };
     const handleAdd = () => navigate('/addelection');
     const handleView = (election) => setModalState({ type: 'view', data: election });
     const handleEdit = (election) => setModalState({ type: 'edit', data: { ...election }, originalData: election });
     const handleDelete = (election) => setModalState({ type: 'delete', data: election });
-    
+
+    // ✅ STATUS TOGGLE
+    const handleStatusToggle = async (electionId, currentStatus) => {
+        const newStatus = currentStatus === 'Active' ? 'Inactive' : 'Active';
+        setElections(prev => prev.map(el => el.id === electionId ? { ...el, status: newStatus } : el));
+        
+        try {
+            await VisionBase.put(`/election/${electionId}`, { status: newStatus === 'Active' });
+        } catch (err) {
+            setElections(prev => prev.map(el => el.id === electionId ? { ...el, status: currentStatus } : el));
+            setError("Failed to update status. Please try again.");
+            console.error("Status toggle error:", err);
+        }
+    };
+
     const handleEditSubmit = async (e) => {
         e.preventDefault();
         setIsLoading(true);
+        setError(null);
 
         const { data: currentData, originalData } = modalState;
         const payload = {};
 
-        // Compare and build payload with only changed fields
         if (currentData.name !== originalData.name) payload.election_name = currentData.name;
         if (currentData.date !== originalData.date) payload.election_date = currentData.date;
         if (currentData.description !== originalData.description) payload.election_desc = currentData.description;
         if (currentData.state !== originalData.state) payload.state = currentData.state;
-        if (currentData.status !== originalData.status) payload.status = currentData.status;
+        if (currentData.status !== originalData.status) payload.status = currentData.status === 'Active';
 
         if (Object.keys(payload).length > 0) {
             try {
@@ -272,6 +249,7 @@ const AllElections = () => {
                 setElections(prev => prev.map(el => (el.id === currentData.id ? currentData : el)));
                 closeModal();
             } catch (error) {
+                setError("Failed to update election. Please try again.");
                 console.error("Failed to update election:", error);
             } finally {
                 setIsLoading(false);
@@ -284,27 +262,38 @@ const AllElections = () => {
 
     const handleDeleteConfirm = async (electionId) => {
         setIsLoading(true);
+        setError(null);
         try {
             await VisionBase.delete(`/election/${electionId}`);
             setElections(prev => prev.filter(el => el.id !== electionId));
             setSelectedIds(prev => prev.filter(id => id !== electionId));
             closeModal();
         } catch (error) {
+            setError("Failed to delete election. Please try again.");
             console.error(`Failed to delete election with ID ${electionId}:`, error);
         } finally {
             setIsLoading(false);
         }
     };
-    
-    const handleBulkDelete = async () => {
+
+    // ✅ BULK DELETE VIA /delete-elections
+    const handleBulkDelete = () => {
+        if (selectedIds.length > 0) {
+            setModalState({ type: 'confirm-bulk-delete' });
+        }
+    };
+
+    const handleBulkDeleteConfirm = async () => {
         setIsLoading(true);
-        const deletePromises = selectedIds.map(id => VisionBase.delete(`/election/${id}`));
+        setError(null);
         try {
-            await Promise.all(deletePromises);
+            await VisionBase.delete('/delete-elections', { data: { ids: selectedIds } });
             setElections(prev => prev.filter(el => !selectedIds.includes(el.id)));
             setSelectedIds([]);
+            closeModal();
         } catch (error) {
-            console.error("Failed to bulk delete elections:", error);
+            setError(error.response?.data?.message || "Failed to bulk delete elections. Please try again.");
+            console.error("Bulk delete error:", error);
         } finally {
             setIsLoading(false);
         }
@@ -340,6 +329,14 @@ const AllElections = () => {
                     </ol>
                 </nav>
             </header>
+
+            {/* Error Banner */}
+            {error && (
+                <div className="mb-6 p-4 bg-red-50 text-red-700 rounded-xl border border-red-200 flex items-center">
+                    <AlertTriangle className="h-5 w-5 mr-2" />
+                    {error}
+                </div>
+            )}
 
             <div className="relative grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
                 <StatCard icon={Trophy} title="Total Elections" value={stats.total} gradient="from-blue-500 to-blue-600" description="All registered elections" />
@@ -392,7 +389,19 @@ const AllElections = () => {
                                         <td className="px-6 py-4"><div className="text-sm font-medium text-gray-900 truncate max-w-xs" title={election.name}>{election.name}</div></td>
                                         <td className="px-6 py-4 text-sm text-gray-700">{election.state}</td>
                                         <td className="px-6 py-4"><span className="inline-flex items-center px-3 py-1 text-xs font-medium bg-gradient-to-r from-blue-100 to-blue-200 text-blue-800 rounded-full border border-blue-200"><Calendar className="h-3 w-3 mr-1" />{formatDate(election.date)}</span></td>
-                                        <td className="px-6 py-4"><StatusBadge status={election.status} /></td>
+                                        <td className="px-6 py-4">
+                                            <button
+                                                onClick={() => handleStatusToggle(election.id, election.status)}
+                                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                                                    election.status === 'Active' ? 'bg-emerald-500' : 'bg-gray-300'
+                                                }`}
+                                                title={`Set to ${election.status === 'Active' ? 'Inactive' : 'Active'}`}
+                                            >
+                                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                                    election.status === 'Active' ? 'translate-x-6' : 'translate-x-1'
+                                                }`} />
+                                            </button>
+                                        </td>
                                         <td className="px-6 py-4">
                                             <div className="flex items-center space-x-2">
                                                 <button onClick={() => handleView(election)} className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all" title="View Details"><Eye className="h-4 w-4" /></button>
@@ -413,7 +422,7 @@ const AllElections = () => {
             </div>
 
             {selectedIds.length > 0 && (
-                <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-red-500 to-red-600 text-white px-6 py-4 rounded-2xl shadow-2xl backdrop-blur-sm border border-red-400/20 animate-in slide-in-from-bottom-4 duration-300">
+                <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-red-500 to-red-600 text-white px-6 py-4 rounded-2xl shadow-2xl backdrop-blur-sm border border-red-400/20 animate-in slide-in-from-bottom-4 duration-300 z-40">
                     <div className="flex items-center space-x-4">
                         <span className="text-sm font-medium">{selectedIds.length} election{selectedIds.length !== 1 ? 's' : ''} selected</span>
                         <button onClick={handleBulkDelete} disabled={isLoading} className="px-4 py-2 bg-red-700 hover:bg-red-800 rounded-xl text-sm font-medium transition-all disabled:opacity-50">{isLoading ? 'Deleting...' : 'Delete Selected'}</button>
@@ -422,6 +431,7 @@ const AllElections = () => {
                 </div>
             )}
             
+            {/* View Modal */}
             <Modal isOpen={modalState.type === 'view'} onClose={closeModal} title="Election Details" size="lg">
                 {modalState.data && (
                     <div className="space-y-6">
@@ -432,31 +442,91 @@ const AllElections = () => {
                             <div className="bg-gray-50 rounded-xl p-4"><p className="text-sm text-gray-600 mb-1">Status</p><StatusBadge status={modalState.data.status} /></div>
                         </div>
                         <div className="bg-gray-50 rounded-xl p-4"><p className="text-sm text-gray-600 mb-2">Election Name</p><p className="font-semibold text-gray-900 text-lg">{modalState.data.name}</p></div>
-                        <div className="bg-gray-50 rounded-xl p-4"><p className="text-sm text-gray-600 mb-3">Description</p><div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: modalState.data.description }} /></div>
+                        <div className="bg-gray-50 rounded-xl p-4">
+                            <p className="text-sm text-gray-600 mb-2">Description</p>
+                            <p className="text-gray-800 whitespace-pre-wrap">{modalState.data.description || '—'}</p>
+                        </div>
                     </div>
                 )}
             </Modal>
             
+            {/* Edit Modal — WITH TEXTAREA */}
             <Modal isOpen={modalState.type === 'edit'} onClose={closeModal} title="Edit Election" size="xl">
                 {modalState.data && (
                     <form onSubmit={handleEditSubmit} className="space-y-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-3"><label className="block text-sm font-semibold text-gray-700">Election Name</label><input name="name" value={modalState.data.name} onChange={(e) => setModalState(prev => ({ ...prev, data: { ...prev.data, name: e.target.value } }))} className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-violet-400 focus:border-transparent bg-white/70 backdrop-blur-sm shadow-sm transition-all" required /></div>
-                            <div className="space-y-3"><label className="block text-sm font-semibold text-gray-700">Election Date</label><input type="date" name="date" value={modalState.data.date} onChange={(e) => setModalState(prev => ({ ...prev, data: { ...prev.data, date: e.target.value } }))} className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-violet-400 focus:border-transparent bg-white/70 backdrop-blur-sm shadow-sm transition-all" required /></div>
+                            <div className="space-y-3">
+                                <label className="block text-sm font-semibold text-gray-700">Election Name</label>
+                                <input 
+                                    name="name" 
+                                    value={modalState.data.name} 
+                                    onChange={(e) => setModalState(prev => ({ ...prev, data: { ...prev.data, name: e.target.value } }))} 
+                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-violet-400 focus:border-transparent bg-white/70 backdrop-blur-sm shadow-sm transition-all" 
+                                    required 
+                                />
+                            </div>
+                            <div className="space-y-3">
+                                <label className="block text-sm font-semibold text-gray-700">Election Date</label>
+                                <input 
+                                    type="date" 
+                                    name="date" 
+                                    value={modalState.data.date} 
+                                    onChange={(e) => setModalState(prev => ({ ...prev, data: { ...prev.data, date: e.target.value } }))} 
+                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-violet-400 focus:border-transparent bg-white/70 backdrop-blur-sm shadow-sm transition-all" 
+                                    required 
+                                />
+                            </div>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-3"><label className="block text-sm font-semibold text-gray-700">State</label><input name="state" value={modalState.data.state || ''} onChange={(e) => setModalState(prev => ({ ...prev, data: { ...prev.data, state: e.target.value } }))} className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-violet-400 focus:border-transparent bg-white/70 backdrop-blur-sm shadow-sm transition-all" required /></div>
-                            <div className="space-y-3"><label className="block text-sm font-semibold text-gray-700">Status</label><select name="status" value={modalState.data.status} onChange={(e) => setModalState(prev => ({ ...prev, data: { ...prev.data, status: e.target.value } }))} className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-violet-400 focus:border-transparent bg-white/70 backdrop-blur-sm shadow-sm transition-all" required><option value="Active">Active</option><option value="Inactive">Inactive</option></select></div>
+                            <div className="space-y-3">
+                                <label className="block text-sm font-semibold text-gray-700">State</label>
+                                <input 
+                                    name="state" 
+                                    value={modalState.data.state || ''} 
+                                    onChange={(e) => setModalState(prev => ({ ...prev, data: { ...prev.data, state: e.target.value } }))} 
+                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-violet-400 focus:border-transparent bg-white/70 backdrop-blur-sm shadow-sm transition-all" 
+                                    required 
+                                />
+                            </div>
+                            <div className="space-y-3">
+                                <label className="block text-sm font-semibold text-gray-700">Status</label>
+                                <select 
+                                    name="status" 
+                                    value={modalState.data.status} 
+                                    onChange={(e) => setModalState(prev => ({ ...prev, data: { ...prev.data, status: e.target.value } }))} 
+                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-violet-400 focus:border-transparent bg-white/70 backdrop-blur-sm shadow-sm transition-all" 
+                                    required
+                                >
+                                    <option value="Active">Active</option>
+                                    <option value="Inactive">Inactive</option>
+                                </select>
+                            </div>
                         </div>
-                        <div className="space-y-3"><label className="block text-sm font-semibold text-gray-700">Election Description</label><RichTextEditor content={modalState.data.description} onChange={(content) => setModalState(prev => ({ ...prev, data: { ...prev.data, description: content } }))} height={250}/></div>
+                        <div className="space-y-3">
+                            <label className="block text-sm font-semibold text-gray-700">Election Description</label>
+                            <textarea
+                                value={modalState.data.description}
+                                onChange={(e) => setModalState(prev => ({ ...prev, data: { ...prev.data, description: e.target.value } }))}
+                                rows="5"
+                                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-violet-400 focus:border-transparent bg-white/70 backdrop-blur-sm shadow-sm transition-all resize-none"
+                                placeholder="Enter election description..."
+                            />
+                        </div>
                         <div className="flex justify-end space-x-3 pt-4">
                             <button type="button" onClick={closeModal} className="px-6 py-3 text-sm font-medium text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-all">Cancel</button>
-                            <button type="submit" disabled={isLoading} className="px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-violet-500 to-purple-500 rounded-xl shadow-lg hover:shadow-xl hover:from-violet-600 hover:to-purple-600 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed transition-all duration-200">{isLoading ? 'Saving...' : 'Save Changes'}</button>
+                            <button 
+                                type="submit" 
+                                disabled={isLoading} 
+                                className="px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-violet-500 to-purple-500 rounded-xl shadow-lg hover:shadow-xl hover:from-violet-600 hover:to-purple-600 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed transition-all duration-200"
+                            >
+                                {isLoading ? 'Saving...' : 'Save Changes'}
+                            </button>
                         </div>
                     </form>
                 )}
             </Modal>
             
+            {/* Single Delete Modal */}
             <Modal isOpen={modalState.type === 'delete'} onClose={closeModal} title="Confirm Deletion" size="sm">
                 {modalState.data && (
                     <div className="text-center space-y-6">
@@ -467,10 +537,52 @@ const AllElections = () => {
                         </div>
                         <div className="flex justify-center space-x-3">
                             <button onClick={closeModal} className="px-6 py-3 text-sm font-medium text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-all">Cancel</button>
-                            <button onClick={() => handleDeleteConfirm(modalState.data.id)} disabled={isLoading} className="px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-red-500 to-red-600 rounded-xl shadow-lg hover:shadow-xl hover:from-red-600 hover:to-red-700 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed transition-all duration-200">{isLoading ? 'Deleting...' : 'Delete Election'}</button>
+                            <button 
+                                onClick={() => handleDeleteConfirm(modalState.data.id)} 
+                                disabled={isLoading} 
+                                className="px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-red-500 to-red-600 rounded-xl shadow-lg hover:shadow-xl hover:from-red-600 hover:to-red-700 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed transition-all duration-200"
+                            >
+                                {isLoading ? 'Deleting...' : 'Delete Election'}
+                            </button>
                         </div>
                     </div>
                 )}
+            </Modal>
+
+            {/* Bulk Delete Confirmation Modal */}
+            <Modal isOpen={modalState.type === 'confirm-bulk-delete'} onClose={closeModal} title="Confirm Bulk Deletion" size="md">
+                <div className="py-4 text-center">
+                    <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Trash2 className="h-8 w-8 text-red-600" />
+                    </div>
+                    <p className="text-gray-700 mb-4">
+                        Are you sure you want to delete <span className="font-bold text-red-600">{selectedIds.length} election{selectedIds.length !== 1 ? 's' : ''}</span>?
+                        This action cannot be undone.
+                    </p>
+                    <div className="flex justify-center space-x-3">
+                        <button
+                            type="button"
+                            onClick={closeModal}
+                            className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={handleBulkDeleteConfirm}
+                            disabled={isLoading}
+                            className="px-6 py-2 bg-gradient-to-r from-red-600 to-red-700 text-white rounded-lg hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center space-x-2"
+                        >
+                            {isLoading ? (
+                                <>
+                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                    <span>Deleting...</span>
+                                </>
+                            ) : (
+                                <span>Delete Elections</span>
+                            )}
+                        </button>
+                    </div>
+                </div>
             </Modal>
         </div>
     );

@@ -228,7 +228,7 @@ const navigate = useNavigate();
         {/* Bottom branding */}
         <div className="text-center mt-6">
           <p className="text-sm text-white/70">
-            © 2024 Vision Data. All rights reserved.
+            © 2025 Vision Data. All rights reserved.
           </p>
         </div>
       </div>

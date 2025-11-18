@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { VisionBase } from '@/utils/axiosInstance'; // Assuming your axios instance is here
+import { VisionBase } from '@/utils/axiosInstance';
+import { toast, Toaster } from 'sonner';
 import {
   Home, ChevronRight, FileText, CheckSquare, Eye, Pencil, X, Trash2, Plus, Loader2, Search, Filter, RotateCcw
 } from 'lucide-react';
@@ -18,6 +19,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter
 } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
@@ -49,8 +51,9 @@ const AllDistricts = () => {
     // State for UI interactions
     const [selectedRows, setSelectedRows] = useState([]);
     const [currentPage, setCurrentPage] = useState(1);
-    const [modalData, setModalData] = useState({ view: null, edit: null, delete: null });
+    const [modalData, setModalData] = useState({ view: null, edit: null, delete: null, bulkDelete: null });
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isBulkDeleting, setIsBulkDeleting] = useState(false);
     
     // State for edit form
     const [editFormData, setEditFormData] = useState({ vidhan_name: '' });
@@ -75,6 +78,7 @@ const AllDistricts = () => {
             }
         } catch (err) {
             setError('Failed to fetch Vidhan Sabha data. Please try again.');
+            toast.error('Failed to fetch Vidhan Sabha data');
             console.error(err);
         } finally {
             setLoading(false);
@@ -104,6 +108,7 @@ const AllDistricts = () => {
         if (searchTerm) {
             filtered = filtered.filter(vs =>
                 vs.vidhan_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                vs.vidhan_id?.toString().includes(searchTerm) ||
                 vs.lok_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 vs.state?.toLowerCase().includes(searchTerm.toLowerCase())
             );
@@ -127,15 +132,14 @@ const AllDistricts = () => {
             lok_name: '',
             state: ''
         });
-        setSelectedRows([]); // Clear selections when resetting filters
+        setSelectedRows([]);
     };
 
     // Update filter
     const updateFilter = (key, value) => {
-        // Convert "all" back to empty string for filtering logic
         const filterValue = value === "all" ? "" : value;
         setFilters(prev => ({ ...prev, [key]: filterValue }));
-        setSelectedRows([]); // Clear selections when changing filters
+        setSelectedRows([]);
     };
 
     const handleSelectAll = (checked) => {
@@ -156,12 +160,12 @@ const AllDistricts = () => {
     };
 
     const closeModal = (type) => {
-        if (isSubmitting) return;
+        if (isSubmitting || isBulkDeleting) return;
         setModalData(prev => ({ ...prev, [type]: null }));
     };
     
     const handleAddNew = () => {
-        navigate('/addvidhansabha'); // Corrected navigation path
+        navigate('/add-vidhan');
     };
     
     const confirmDelete = async () => {
@@ -170,11 +174,11 @@ const AllDistricts = () => {
         try {
             await VisionBase.delete(`/vidhan/${modalData.delete.vidhan_id}`);
             setVidhanSabhaData(prev => prev.filter(item => item.vidhan_id !== modalData.delete.vidhan_id));
-            alert(`Vidhan Sabha "${modalData.delete.vidhan_name}" deleted successfully!`);
+            toast.success(`Vidhan Sabha "${modalData.delete.vidhan_name}" deleted successfully!`);
             closeModal('delete');
         } catch (err) {
             console.error("Delete failed:", err);
-            alert(`Failed to delete. ${err.response?.data?.message || 'Please try again.'}`);
+            toast.error(err.response?.data?.message || 'Failed to delete. Please try again.');
         } finally {
             setIsSubmitting(false);
         }
@@ -182,7 +186,7 @@ const AllDistricts = () => {
 
     const handleUpdate = async () => {
         if (!modalData.edit || !editFormData.vidhan_name.trim()) {
-            alert("Vidhan Sabha name cannot be empty.");
+            toast.error("Vidhan Sabha name cannot be empty.");
             return;
         }
         setIsSubmitting(true);
@@ -193,48 +197,78 @@ const AllDistricts = () => {
             setVidhanSabhaData(prev => prev.map(item => 
                 item.vidhan_id === modalData.edit.vidhan_id ? { ...item, ...payload } : item
             ));
-            alert(`Vidhan Sabha updated successfully!`);
+            toast.success('Vidhan Sabha updated successfully!');
             closeModal('edit');
         } catch (err) {
             console.error("Update failed:", err);
-            alert(`Failed to update. ${err.response?.data?.message || 'Please try again.'}`);
+            toast.error(err.response?.data?.message || 'Failed to update. Please try again.');
         } finally {
             setIsSubmitting(false);
         }
     };
 
-    const handleBulkDelete = async () => {
+    const handleBulkDeleteClick = () => {
         if (selectedRows.length === 0) {
-            alert("Please select rows to delete.");
+            toast.error("Please select at least one Vidhan Sabha to delete.");
             return;
         }
-        if (!window.confirm(`Are you sure you want to delete ${selectedRows.length} record(s)?`)) return;
-
-        const originalData = [...vidhanSabhaData];
-        // Optimistic UI update
-        setVidhanSabhaData(prev => prev.filter(item => !selectedRows.includes(item.vidhan_id)));
         
+        const vidhansToDelete = vidhanSabhaData.filter(vs => selectedRows.includes(vs.vidhan_id));
+        openModal('bulkDelete', vidhansToDelete);
+    };
+
+    const confirmBulkDelete = async () => {
+        if (!modalData.bulkDelete || modalData.bulkDelete.length === 0) return;
+        
+        setIsBulkDeleting(true);
         try {
-            await Promise.all(selectedRows.map(id => VisionBase.delete(`/vidhan/${id}`)));
-            alert(`Successfully deleted ${selectedRows.length} records.`);
+            const idsToDelete = modalData.bulkDelete.map(vs => vs.vidhan_id);
+            
+            await VisionBase.delete('/delete-vidhans', {
+                data: { ids: idsToDelete }
+            });
+
+            setVidhanSabhaData(prev => prev.filter(vs => !idsToDelete.includes(vs.vidhan_id)));
             setSelectedRows([]);
+            toast.success(`Successfully deleted ${idsToDelete.length} Vidhan Sabha(s).`);
+            closeModal('bulkDelete');
         } catch (err) {
             console.error("Bulk delete failed:", err);
-            alert("Failed to delete some records. Reverting changes.");
-            setVidhanSabhaData(originalData); // Rollback on failure
+            toast.error(err.response?.data?.message || "Failed to delete Vidhan Sabhas. Please try again.");
+        } finally {
+            setIsBulkDeleting(false);
         }
     };
     
     if (loading) {
-        return <div className="p-8 text-center">Loading data...</div>;
+        return (
+            <div className="bg-gray-50/50 min-h-screen p-4 sm:p-6 lg:p-8 flex items-center justify-center">
+                <div className="text-center">
+                    <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto" />
+                    <p className="mt-2 text-gray-600">Loading Vidhan Sabha data...</p>
+                </div>
+            </div>
+        );
     }
     
     if (error) {
-        return <div className="p-8 text-center text-red-500">{error}</div>;
+        return (
+            <div className="bg-gray-50/50 min-h-screen p-4 sm:p-6 lg:p-8 flex items-center justify-center">
+                <div className="text-center bg-red-50 border border-red-200 rounded-lg p-8">
+                    <Trash2 className="h-12 w-12 text-red-500 mx-auto mb-4" />
+                    <p className="text-lg text-red-700 mb-4">{error}</p>
+                    <Button onClick={fetchVidhanSabhas} className="bg-blue-600 hover:bg-blue-700">
+                        <RotateCcw className="h-4 w-4 mr-2" />
+                        Retry
+                    </Button>
+                </div>
+            </div>
+        );
     }
 
     return (
         <div className="bg-gray-50/50 min-h-screen p-4 sm:p-6 lg:p-8">
+            <Toaster richColors position="top-right" />
             <div className="max-w-full mx-auto">
                 {/* Header */}
                 <div className="flex justify-between items-start mb-4">
@@ -276,12 +310,17 @@ const AllDistricts = () => {
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                             <Input
-                                placeholder="Search vidhan sabha, loksabha, or state..."
+                                placeholder="Search by ID, vidhan sabha, loksabha, or state..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 className="pl-10"
                             />
                         </div>
+                        {searchTerm && (
+                            <p className="text-sm text-gray-600">
+                                Found {filteredVidhanSabhas.length} result(s) for "{searchTerm}"
+                            </p>
+                        )}
 
                         {/* Filter Dropdowns */}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -403,8 +442,8 @@ const AllDistricts = () => {
                                                     />
                                                 </TableCell>
                                                 <TableCell className="font-medium">{vs.vidhan_id}</TableCell>
-                                                <TableCell>{vs.vidhan_name}</TableCell>
-                                                <TableCell>{vs.lok_name}</TableCell>
+                                                <TableCell className="whitespace-normal">{vs.vidhan_name}</TableCell>
+                                                <TableCell className="whitespace-normal">{vs.lok_name}</TableCell>
                                                 <TableCell>{vs.state}</TableCell>
                                                 <TableCell>
                                                     <div className="flex justify-center space-x-1">
@@ -427,12 +466,17 @@ const AllDistricts = () => {
                         </div>
                     </CardContent>
                     {/* Footer with Bulk Actions and Pagination */}
-                    <div className="px-6 py-4 flex flex-wrap gap-4 justify-between items-center">
+                    <div className="px-6 py-4 flex flex-wrap gap-4 justify-between items-center border-t">
                         <div>
                             {selectedRows.length > 0 && (
                                 <div className="flex items-center space-x-2">
                                      <span className="text-sm text-gray-600">{selectedRows.length} selected</span>
-                                     <Button variant="destructive" size="sm" onClick={handleBulkDelete}>
+                                     <Button 
+                                        variant="destructive" 
+                                        size="sm" 
+                                        className="bg-red-600 hover:bg-red-700"
+                                        onClick={handleBulkDeleteClick}
+                                    >
                                         <Trash2 className="h-4 w-4 mr-2" />
                                         Delete Selected
                                      </Button>
@@ -487,7 +531,7 @@ const AllDistricts = () => {
                 </DialogContent>
             </Dialog>
 
-            {/* Delete Confirmation Modal */}
+            {/* Single Delete Confirmation Modal */}
             <Dialog open={!!modalData.delete} onOpenChange={() => closeModal('delete')}>
                 <DialogContent>
                     <DialogHeader><DialogTitle className="flex items-center"><Trash2 className="mr-2 text-red-500"/>Are you sure?</DialogTitle><DialogDescription>This will permanently delete the record for "{modalData.delete?.vidhan_name}". This action cannot be undone.</DialogDescription></DialogHeader>
@@ -496,6 +540,56 @@ const AllDistricts = () => {
                         <Button variant="destructive" onClick={confirmDelete} disabled={isSubmitting}>
                             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
                             Confirm Delete
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Bulk Delete Confirmation Modal */}
+            <Dialog open={!!modalData.bulkDelete} onOpenChange={() => closeModal('bulkDelete')}>
+                <DialogContent className="sm:max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center">
+                            <Trash2 className="mr-2 text-red-600"/>
+                            Delete Multiple Vidhan Sabhas
+                        </DialogTitle>
+                        <DialogDescription>
+                            This action cannot be undone. This will permanently delete {modalData.bulkDelete?.length} Vidhan Sabha(s).
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="max-h-[400px] overflow-y-auto py-4">
+                        <h4 className="font-semibold mb-3 text-gray-700">Vidhan Sabhas to be deleted:</h4>
+                        <ul className="space-y-2">
+                            {modalData.bulkDelete?.map((vs, index) => (
+                                <li key={vs.vidhan_id} className="flex items-start gap-2 p-3 bg-slate-50 rounded-md border border-slate-200">
+                                    <span className="font-medium text-gray-600 min-w-[30px]">{index + 1}.</span>
+                                    <div className="flex-grow">
+                                        <p className="text-sm font-medium text-gray-800">{vs.vidhan_name}</p>
+                                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                            <Badge variant="secondary" className="bg-purple-100 text-purple-800 border-0 text-xs">
+                                                {vs.lok_name}
+                                            </Badge>
+                                            <Badge variant="secondary" className="bg-orange-100 text-orange-800 border-0 text-xs">
+                                                {vs.state}
+                                            </Badge>
+                                            <span className="text-xs text-gray-500">ID: {vs.vidhan_id}</span>
+                                        </div>
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => closeModal('bulkDelete')} disabled={isBulkDeleting}>
+                            Cancel
+                        </Button>
+                        <Button 
+                            className="bg-red-600 text-white hover:bg-red-700" 
+                            onClick={confirmBulkDelete}
+                            disabled={isBulkDeleting}
+                        >
+                            {isBulkDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            {isBulkDeleting ? 'Deleting...' : `Delete ${modalData.bulkDelete?.length} Vidhan Sabha(s)`}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

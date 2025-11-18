@@ -36,7 +36,7 @@ import {
 import { VisionBase } from '@/utils/axiosInstance';
 
 // ===================================================================================
-// MODERN UI COMPONENTS
+// MODERN UI COMPONENTS (Keep all existing UI components as is)
 // ===================================================================================
 
 const Card = ({ children, className = "" }) => (
@@ -284,6 +284,20 @@ const DialogFooter = ({ children, className = "" }) => (
     </div>
 );
 
+const Badge = ({ children, variant = "default", className = "" }) => {
+    const variants = {
+        default: "bg-gray-100 text-gray-800",
+        success: "bg-green-100 text-green-800",
+        warning: "bg-yellow-100 text-yellow-800",
+        danger: "bg-red-100 text-red-800"
+    };
+    return (
+        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${variants[variant]} ${className}`}>
+            {children}
+        </span>
+    );
+};
+
 const Pagination = ({ currentPage, totalPages, onPageChange }) => {
     const getVisiblePages = () => {
         const delta = 1, range = [], rangeWithDots = [];
@@ -329,6 +343,15 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
 };
 
 // ===================================================================================
+// TOAST NOTIFICATION (Simple implementation)
+// ===================================================================================
+const toast = {
+    success: (message) => alert(message),
+    error: (message) => alert(message),
+    info: (message) => alert(message)
+};
+
+// ===================================================================================
 // MAIN COMPONENT
 // ===================================================================================
 
@@ -351,6 +374,8 @@ const AllSurveyData = () => {
     // State for modals/dialogs
     const [viewModalData, setViewModalData] = useState(null);
     const [deleteModalData, setDeleteModalData] = useState(null);
+    const [bulkDeleteModalData, setBulkDeleteModalData] = useState(null);
+    const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
     // State for pagination
     const [currentPage, setCurrentPage] = useState(1);
@@ -359,7 +384,7 @@ const AllSurveyData = () => {
     // State for derived filter options
     const [filterOptions, setFilterOptions] = useState({ zones: [], ots: [], zcs: [] });
 
-    // NEW: State for AI analysis
+    // State for AI analysis
     const [analysisData, setAnalysisData] = useState(null);
     const [analysisLoading, setAnalysisLoading] = useState(false);
     const [analysisError, setAnalysisError] = useState(null);
@@ -391,7 +416,6 @@ const AllSurveyData = () => {
             const result = await response.json();
             const responseText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
             
-            // Parse the AI response to extract useful data
             const analysisResult = parseAnalysisResponse(responseText);
             setAnalysisData(analysisResult);
             
@@ -406,11 +430,9 @@ const AllSurveyData = () => {
     // Helper function to parse AI response
     const parseAnalysisResponse = (responseText) => {
         try {
-            // Extract percentage if mentioned
             const percentageMatch = responseText.match(/(\d+(?:\.\d+)?)\s*%/);
             const authenticity = percentageMatch ? parseFloat(percentageMatch[1]) : null;
             
-            // Determine status based on percentage
             let status = 'unknown';
             let statusColor = 'gray';
             let statusIcon = AlertTriangle;
@@ -483,7 +505,9 @@ const AllSurveyData = () => {
                 full_location: item.location 
             }));
             
-            setSurveyData(transformedData);
+            // Sort surveys by ID in ascending order
+            const sortedData = transformedData.sort((a, b) => parseInt(a.id) - parseInt(b.id));
+            setSurveyData(sortedData);
         } catch (err) {
             setError(err.message || 'Failed to fetch survey data. Please check your API endpoint.');
             console.error('Error fetching surveys:', err);
@@ -552,9 +576,42 @@ const AllSurveyData = () => {
     const handleExport = (type) => { console.log(`Exporting ${type} CSV with selected rows:`, selectedRows); };
     const handleViewClick = (rowData) => {
         setViewModalData(rowData);
-        setAnalysisData(null); // Reset analysis data when viewing new survey
+        setAnalysisData(null);
     };
     const handleDeleteClick = (rowData) => setDeleteModalData(rowData);
+
+    // Bulk delete handlers
+    const handleBulkDeleteClick = () => {
+        if (selectedRows.length === 0) {
+            toast.error("Please select at least one survey to delete.");
+            return;
+        }
+        const selectedSurveys = surveyData.filter(s => selectedRows.includes(s.id));
+        setBulkDeleteModalData(selectedSurveys);
+    };
+
+    const confirmBulkDelete = async () => {
+        if (!bulkDeleteModalData || bulkDeleteModalData.length === 0) return;
+        
+        setIsBulkDeleting(true);
+        try {
+            const idsToDelete = bulkDeleteModalData.map(s => parseInt(s.id));
+            
+            await VisionBase.delete('/delete-surveys', {
+                data: { ids: idsToDelete }
+            });
+
+            setSurveyData(prev => prev.filter(s => !idsToDelete.includes(parseInt(s.id))));
+            setSelectedRows([]);
+            setBulkDeleteModalData(null);
+            toast.success(`Successfully deleted ${idsToDelete.length} survey(s).`);
+        } catch (err) {
+            console.error("Failed to delete surveys:", err);
+            toast.error(err.response?.data?.message || "Failed to delete surveys. Please try again.");
+        } finally {
+            setIsBulkDeleting(false);
+        }
+    };
 
     const confirmDelete = () => {
         console.log("Deleting record:", deleteModalData);
@@ -605,6 +662,16 @@ const AllSurveyData = () => {
                         <div className="flex items-center space-x-2">
                            <Button onClick={() => handleExport('all')} variant="outline" size="md" disabled={loading}><Download className="h-4 w-4 mr-2"/>Export All</Button>
                            <Button onClick={() => handleExport('selected')} variant="outline" size="md" disabled={selectedRows.length === 0}><Download className="h-4 w-4 mr-2"/>Export Selected</Button>
+                           {selectedRows.length > 0 && (
+                               <Button 
+                                   onClick={handleBulkDeleteClick} 
+                                   variant="destructive" 
+                                   size="md"
+                               >
+                                   <Trash2 className="h-4 w-4 mr-2"/>
+                                   Delete Selected ({selectedRows.length})
+                               </Button>
+                           )}
                            <Button onClick={handleRefresh} variant="ghost" size="icon" disabled={loading}><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`}/></Button>
                         </div>
                     </CardHeader>
@@ -758,8 +825,6 @@ const AllSurveyData = () => {
                                                     </div>
                                                 </div>
                                             </div>
-                                            
-                                           
                                         </div>
                                     )}
                                     
@@ -857,6 +922,55 @@ const AllSurveyData = () => {
                     <DialogFooter>
                         <Button variant="secondary" onClick={() => setDeleteModalData(null)}>Cancel</Button>
                         <Button variant="destructive" onClick={confirmDelete}>Delete</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Bulk Delete Confirmation Modal */}
+            <Dialog isOpen={!!bulkDeleteModalData} onClose={() => setBulkDeleteModalData(null)}>
+                <DialogContent size="xl">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center">
+                            <Trash2 className="mr-2 text-red-600"/>
+                            Delete Multiple Surveys
+                        </DialogTitle>
+                    </DialogHeader>
+                    <DialogBody>
+                        <p className="text-gray-600 mb-4">
+                            This action cannot be undone. This will permanently delete {bulkDeleteModalData?.length} survey(s).
+                        </p>
+                        <div className="max-h-[400px] overflow-y-auto py-4">
+                            <h4 className="font-semibold mb-3 text-gray-700">Surveys to be deleted:</h4>
+                            <ul className="space-y-2">
+                                {bulkDeleteModalData?.map((survey, index) => (
+                                    <li key={survey.id} className="flex items-start gap-2 p-3 bg-gray-50 rounded-md border border-gray-200">
+                                        <span className="font-medium text-gray-600 min-w-[30px]">{index + 1}.</span>
+                                        <div className="flex-grow">
+                                            <p className="text-sm font-medium text-gray-800">{survey.name}</p>
+                                            <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                                <Badge variant="default">ID: {survey.id}</Badge>
+                                                <Badge variant="default">OT: {survey.otName}</Badge>
+                                                <Badge variant="default">{survey.zone}</Badge>
+                                                <span className="text-xs text-gray-500">{survey.date}</span>
+                                            </div>
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    </DialogBody>
+                    <DialogFooter>
+                        <Button variant="secondary" onClick={() => setBulkDeleteModalData(null)} disabled={isBulkDeleting}>
+                            Cancel
+                        </Button>
+                        <Button 
+                            variant="destructive"
+                            onClick={confirmBulkDelete}
+                            disabled={isBulkDeleting}
+                        >
+                            {isBulkDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            {isBulkDeleting ? 'Deleting...' : `Delete ${bulkDeleteModalData?.length} Survey(s)`}
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

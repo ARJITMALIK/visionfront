@@ -1,168 +1,249 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Home, ChevronRight, Menu, ArrowLeft, RefreshCw, FileText } from 'lucide-react';
-import { CKEditor } from '@ckeditor/ckeditor5-react';
-import ClassicEditor from '@ckeditor/ckeditor5-build-classic';
-
-// Assuming you have shadcn/ui components in these paths
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
-} from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-
-// A reusable form row component for consistent styling
-const FormRow = ({ label, required, children, isEditor = false }) => (
-    <div className={`flex flex-col md:flex-row items-start border-b border-dotted border-gray-200 py-4 last:border-b-0 ${isEditor ? 'md:items-start' : 'md:items-center'}`}>
-        <div className="w-full md:w-1/4 mb-2 md:mb-0 md:pr-4 text-left md:text-right">
-            <label className="font-medium text-gray-700">
-                {label} {required && <span className="text-red-500">*</span>}
-            </label>
-        </div>
-        <div className="w-full md:w-3/4">
-            {children}
-        </div>
-    </div>
-);
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ArrowLeft, Trash2, Bell } from 'lucide-react';
+import { VisionBase } from '@/utils/axiosInstance';
 
 const AddNotification = () => {
-    const navigate = useNavigate();
+  const [formData, setFormData] = useState({
+    title: '',
+    description: ''
+  });
+  const [notifications, setNotifications] = useState([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [message, setMessage] = useState({ type: '', text: '' });
 
-    const initialFormData = {
-        electionId: '',
+  useEffect(() => {
+    fetchNotifications();
+  }, []);
+
+  const fetchNotifications = async () => {
+    try {
+      setIsLoading(true);
+      const response = await VisionBase.get('/notifications');
+      setNotifications(response.data.data.rows || []);
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+      setMessage({ 
+        type: 'error', 
+        text: 'Failed to load notifications.' 
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleInputChange = (field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+    if (message.text) {
+      setMessage({ type: '', text: '' });
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setMessage({ type: '', text: '' });
+
+    if (!formData.title || !formData.description) {
+      setMessage({ type: 'error', text: 'Please fill in all required fields.' });
+      setIsSubmitting(false);
+      return;
+    }
+
+    try {
+      const payload = {
+        title: formData.title,
+        description: formData.description
+      };
+
+      await VisionBase.post('/notification', payload);
+      
+      setMessage({ type: 'success', text: 'Notification created successfully!' });
+      setFormData({
         title: '',
-        detail: '',
-    };
+        description: ''
+      });
+      
+      // Refresh notifications list
+      fetchNotifications();
+    } catch (error) {
+      console.error('Error creating notification:', error);
+      setMessage({ 
+        type: 'error', 
+        text: error.message || 'Failed to create notification. Please try again.' 
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
-    const [formData, setFormData] = useState(initialFormData);
+  const handleDelete = async (notificationId) => {
+    if (!window.confirm('Are you sure you want to delete this notification?')) {
+      return;
+    }
 
-    const handleInputChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
-    };
+    try {
+      await VisionBase.delete(`/notification/${notificationId}`);
+      setMessage({ type: 'success', text: 'Notification deleted successfully!' });
+      fetchNotifications();
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+      setMessage({ 
+        type: 'error', 
+        text: 'Failed to delete notification. Please try again.' 
+      });
+    }
+  };
 
-    const handleSelectChange = (name, value) => {
-        setFormData(prev => ({ ...prev, [name]: value }));
-    };
+  const handleReset = () => {
+    setFormData({
+      title: '',
+      description: ''
+    });
+    setMessage({ type: '', text: '' });
+  };
 
-    const handleEditorChange = (event, editor) => {
-        const data = editor.getData();
-        setFormData(prev => ({ ...prev, detail: data }));
-    };
-    
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        // Dummy API call simulation
-        console.log("Submitting form data:", JSON.stringify(formData, null, 2));
-        alert("Form data has been logged to the console. Ready for backend API integration.");
-        // To reset the form after submission, uncomment the next line
-        // setFormData(initialFormData);
-    };
-
-    const handleReset = () => {
-        setFormData(initialFormData);
-        console.log("Form has been reset.");
-    };
-
-    // --- THIS IS THE CHANGE ---
-    // Update this function to navigate to the "/allnotifications" route
-    const handleBack = () => {
-        navigate('/allnotifications');
-    };
-
-    return (
-        <div className="bg-gray-50/50 min-h-screen p-4 sm:p-6 lg:p-8">
-            <div className="max-w-7xl mx-auto">
-                {/* Header */}
-                <div className="flex justify-between items-start mb-4">
-                    <div>
-                        <h1 className="text-2xl font-bold text-gray-800">Notification</h1>
-                        <p className="text-sm text-gray-500">Notification Add Notification</p>
-                    </div>
-                    <div className="p-2 bg-gray-200 rounded-md">
-                       <FileText className="h-6 w-6 text-gray-500" />
-                    </div>
+  return (
+    <div className="min-h-screen bg-gray-50 p-4">
+      <div className="max-w-4xl mx-auto space-y-6">
+        {/* Add Notification Form */}
+        <Card className="shadow-lg">
+          <CardHeader className="bg-white border-b">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
+                  <Bell className="w-5 h-5 text-gray-600" />
+                  <span className="text-lg font-medium text-gray-700">Add Notification</span>
                 </div>
-
-                {/* Breadcrumbs */}
-                <div className="flex items-center text-sm text-gray-500 mb-6">
-                    <Home className="h-4 w-4 text-brand-secondary" />
-                    <ChevronRight className="h-4 w-4 mx-1" />
-                    <span className="text-brand-secondary">Notification</span>
-                    <ChevronRight className="h-4 w-4 mx-1" />
-                    <span className="text-brand-secondary">Notification</span>
-                    <ChevronRight className="h-4 w-4 mx-1" />
-                    <span className="text-gray-700 font-medium">Add Notification</span>
-                </div>
-
-                {/* Main Form Card */}
-                <Card className="shadow-sm">
-                    <CardHeader className="flex flex-row items-center justify-between border-b">
-                        <div className="flex items-center">
-                            <Menu className="h-5 w-5 mr-3 text-gray-600"/>
-                            <CardTitle className="text-lg font-semibold">Notification</CardTitle>
-                        </div>
-                        <Button
-                            className="bg-brand-primary text-white hover:bg-brand-primary-dark"
-                            onClick={handleBack}
-                        >
-                            <ArrowLeft className="h-4 w-4 mr-2" />
-                            Back
-                        </Button>
-                    </CardHeader>
-                    <CardContent className="p-6">
-                        <form onSubmit={handleSubmit}>
-                            <div className="space-y-2">
-                                <FormRow label="Election" required>
-                                    <Select onValueChange={(value) => handleSelectChange('electionId', value)} value={formData.electionId}>
-                                        <SelectTrigger><SelectValue placeholder="Select Election" /></SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="election-1">Lok Sabha 2024</SelectItem>
-                                            <SelectItem value="election-2">State Assembly 2025</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </FormRow>
-
-                                <FormRow label="Title" required>
-                                    <Input
-                                        name="title"
-                                        value={formData.title}
-                                        onChange={handleInputChange}
-                                        placeholder="Title"
-                                    />
-                                </FormRow>
-
-                                <FormRow label="Detail" required isEditor>
-                                    <div className="prose max-w-none w-full ck-editor-container">
-                                        <CKEditor
-                                            editor={ClassicEditor}
-                                            data={formData.detail}
-                                            onChange={handleEditorChange}
-                                        />
-                                    </div>
-                                </FormRow>
-                            </div>
-                            
-                            <div className="flex justify-start pt-8">
-                                <Button type="submit" className="bg-brand-primary text-white hover:bg-brand-primary-dark mr-3 flex items-center">
-                                    <ChevronRight className="h-4 w-4" /> <span>Submit</span>
-                                </Button>
-                                <Button
-                                    type="button"
-                                    onClick={handleReset}
-                                    style={{ backgroundColor: '#f5b82e', color: 'white' }}
-                                    className="hover:opacity-90 flex items-center"
-                                >
-                                    <RefreshCw className="h-4 w-4 mr-1" /> <span>Reset</span>
-                                </Button>
-                            </div>
-                        </form>
-                    </CardContent>
-                </Card>
+              </div>
+             
             </div>
-        </div>
-    );
+          </CardHeader>
+          
+          <CardContent className="p-8">
+            {message.text && (
+              <Alert className={`mb-6 ${message.type === 'error' ? 'border-red-200 bg-red-50' : 'border-green-200 bg-green-50'}`}>
+                <AlertDescription className={message.type === 'error' ? 'text-red-700' : 'text-green-700'}>
+                  {message.text}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="title" className="text-sm font-medium text-gray-700">
+                  Notification Title <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="title"
+                  type="text"
+                  placeholder="Enter notification title"
+                  value={formData.title}
+                  onChange={(e) => handleInputChange('title', e.target.value)}
+                  className="w-full"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="description" className="text-sm font-medium text-gray-700">
+                  Notification Description <span className="text-red-500">*</span>
+                </Label>
+                <Textarea
+                  id="description"
+                  placeholder="Enter notification description..."
+                  value={formData.description}
+                  onChange={(e) => handleInputChange('description', e.target.value)}
+                  className="w-full min-h-[150px] resize-none"
+                  rows={6}
+                  required
+                />
+              </div>
+
+              <div className="flex gap-4 pt-4">
+                <Button
+                  onClick={handleSubmit}
+                  disabled={isSubmitting}
+                  className="bg-red-500 hover:bg-red-600 text-white px-6 py-2"
+                >
+                  {isSubmitting ? 'Submitting...' : 'Submit'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleReset}
+                  className="bg-orange-500 hover:bg-orange-600 text-white border-orange-500 px-6 py-2"
+                >
+                  Reset
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Notifications List */}
+        <Card className="shadow-lg">
+          <CardHeader className="bg-white border-b">
+            <CardTitle className="text-lg font-medium text-gray-700">
+              Notifications List
+            </CardTitle>
+          </CardHeader>
+          
+          <CardContent className="p-6">
+            {isLoading ? (
+              <div className="text-center py-8 text-gray-500">
+                Loading notifications...
+              </div>
+            ) : notifications.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                No notifications found. Create your first notification above.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {notifications.map((notification) => (
+                  <div
+                    key={notification.id}
+                    className="flex items-start justify-between p-4 bg-white border border-gray-200 rounded-lg hover:shadow-md transition-shadow"
+                  >
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-gray-900 mb-2">
+                        {notification.title}
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        {notification.description}
+                      </p>
+                      {notification.created_at && (
+                        <p className="text-xs text-gray-400 mt-2">
+                          {new Date(notification.created_at).toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDelete(notification.id)}
+                      className="ml-4 text-red-500 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
 };
 
 export default AddNotification;
