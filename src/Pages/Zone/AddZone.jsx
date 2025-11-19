@@ -32,7 +32,7 @@ const AddZone = () => {
         lat: '',
         lon: '',
         range: '',
-        limit: '',
+        survey_limit: '',
     };
 
     const [formData, setFormData] = useState(initialFormData);
@@ -94,9 +94,9 @@ const AddZone = () => {
             return;
         }
 
-        // Validate limit if provided
-        if (formData.limit && (isNaN(formData.limit) || formData.limit < 0 || !Number.isInteger(Number(formData.limit)))) {
-            alert("Please enter a valid survey per booth limit (must be a positive whole number).");
+        // Validate survey_limit if provided
+        if (formData.survey_limit && (isNaN(formData.survey_limit) || formData.survey_limit < 0 || !Number.isInteger(Number(formData.survey_limit)))) {
+            alert("Please enter a valid survey per booth survey_limit (must be a positive whole number).");
             return;
         }
         
@@ -108,7 +108,7 @@ const AddZone = () => {
                 lat: formData.lat || null,
                 lon: formData.lon || null,
                 range: formData.range || null,
-                limit: formData.limit || null,
+                survey_limit: formData.survey_limit || null,
             };
 
             await VisionBase.post('/add-zone', submissionData);
@@ -242,10 +242,10 @@ const AddZone = () => {
 
                                 <FormRow label="Survey per Booth">
                                     <Input
-                                        name="limit"
-                                        value={formData.limit}
+                                        name="survey_limit"
+                                        value={formData.survey_limit}
                                         onChange={handleInputChange}
-                                        placeholder="Enter survey limit per booth (e.g., 100)"
+                                        placeholder="Enter survey survey_limit per booth (e.g., 100)"
                                         disabled={isSubmitting}
                                         type="number"
                                         step="1"

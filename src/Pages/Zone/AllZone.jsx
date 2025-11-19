@@ -58,7 +58,7 @@ const AllZones = () => {
     const [editFormData, setEditFormData] = useState({ 
         zone_name: '',
         range: '',
-        limit: ''
+        survey_limit: ''
     });
 
     // State for filters and search
@@ -168,7 +168,7 @@ const AllZones = () => {
             setEditFormData({ 
                 zone_name: data.zone_name,
                 range: data.range || '',
-                limit: data.limit || ''
+                survey_limit: data.survey_limit || ''
             });
         }
         setModalData(prev => ({ ...prev, [type]: data }));
@@ -211,9 +211,9 @@ const AllZones = () => {
             return;
         }
 
-        // Validate limit if provided
-        if (editFormData.limit && (isNaN(editFormData.limit) || editFormData.limit < 0 || !Number.isInteger(Number(editFormData.limit)))) {
-            toast.error("Please enter a valid survey limit (must be a positive whole number).");
+        // Validate survey_limit if provided
+        if (editFormData.survey_limit && (isNaN(editFormData.survey_limit) || editFormData.survey_limit < 0 || !Number.isInteger(Number(editFormData.survey_limit)))) {
+            toast.error("Please enter a valid survey survey_limit (must be a positive whole number).");
             return;
         }
 
@@ -221,8 +221,8 @@ const AllZones = () => {
         try {
             const payload = { 
                 zone_name: editFormData.zone_name,
-                range: editFormData.range || null,
-                limit: editFormData.limit || null
+               range: editFormData.range ? Number(editFormData.range) : null,
+                survey_limit: editFormData.survey_limit ? Number(editFormData.survey_limit) : null
             };
             await VisionBase.put(`/zone/${modalData.edit.zone_id}`, payload);
             
@@ -475,7 +475,7 @@ const AllZones = () => {
                                         <TableHead>Loksabha Name</TableHead>
                                         <TableHead>State</TableHead>
                                         <TableHead>Range (km)</TableHead>
-                                        <TableHead>Survey Limit</TableHead>
+                                        <TableHead>Survey limit</TableHead>
                                         <TableHead>Surveys Filled</TableHead>
                                         <TableHead className="text-center">Actions</TableHead>
                                     </TableRow>
@@ -492,9 +492,9 @@ const AllZones = () => {
                                     ) : (
                                         filteredZones.map((zone) => {
                                             const surveyFilled = zone.surveyfilled || 0;
-                                            const surveyLimit = zone.limit || 0;
-                                            const isAtLimit = surveyLimit > 0 && surveyFilled >= surveyLimit;
-                                            const progressPercent = surveyLimit > 0 ? Math.min((surveyFilled / surveyLimit) * 100, 100) : 0;
+                                            const surveysurvey_limit = zone.survey_limit || 0;
+                                            const isAtsurvey_limit = surveysurvey_limit > 0 && surveyFilled >= surveysurvey_limit;
+                                            const progressPercent = surveysurvey_limit > 0 ? Math.min((surveyFilled / surveysurvey_limit) * 100, 100) : 0;
 
                                             return (
                                                 <TableRow key={zone.zone_id}>
@@ -510,20 +510,20 @@ const AllZones = () => {
                                                     <TableCell className="whitespace-normal">{zone.lok_name}</TableCell>
                                                     <TableCell>{zone.state}</TableCell>
                                                     <TableCell>{zone.range ? `${zone.range} km` : 'N/A'}</TableCell>
-                                                    <TableCell>{zone.limit || 'N/A'}</TableCell>
+                                                    <TableCell>{zone.survey_limit || 'N/A'}</TableCell>
                                                     <TableCell>
                                                         <div className="flex items-center gap-2">
-                                                            <span className={`font-medium ${isAtLimit ? 'text-red-600' : 'text-gray-700'}`}>
+                                                            <span className={`font-medium ${isAtsurvey_limit ? 'text-red-600' : 'text-gray-700'}`}>
                                                                 {surveyFilled}
                                                             </span>
-                                                            {surveyLimit > 0 && (
+                                                            {surveysurvey_limit > 0 && (
                                                                 <>
                                                                     <span className="text-gray-400">/</span>
-                                                                    <span className="text-gray-600">{surveyLimit}</span>
+                                                                    <span className="text-gray-600">{surveysurvey_limit}</span>
                                                                     <Badge 
                                                                         variant="secondary" 
                                                                         className={`text-xs ${
-                                                                            isAtLimit 
+                                                                            isAtsurvey_limit 
                                                                                 ? 'bg-red-100 text-red-700' 
                                                                                 : progressPercent >= 75 
                                                                                 ? 'bg-yellow-100 text-yellow-700'
@@ -619,29 +619,29 @@ const AllZones = () => {
                                 <span className="font-semibold text-gray-700">Range:</span>
                                 <span className="text-gray-900">{modalData.view.range ? `${modalData.view.range} km` : 'N/A'}</span>
                                 
-                                <span className="font-semibold text-gray-700">Survey Limit:</span>
-                                <span className="text-gray-900">{modalData.view.limit || 'N/A'}</span>
+                                <span className="font-semibold text-gray-700">Survey survey_limit:</span>
+                                <span className="text-gray-900">{modalData.view.survey_limit || 'N/A'}</span>
                                 
                                 <span className="font-semibold text-gray-700">Surveys Filled:</span>
                                 <span className="text-gray-900">{modalData.view.surveyfilled || 0}</span>
                             </div>
 
-                            {modalData.view.limit > 0 && (
+                            {modalData.view.survey_limit > 0 && (
                                 <div className="pt-3 border-t">
                                     <div className="flex justify-between text-xs text-gray-600 mb-1">
                                         <span>Progress</span>
-                                        <span>{((modalData.view.surveyfilled || 0) / modalData.view.limit * 100).toFixed(1)}%</span>
+                                        <span>{((modalData.view.surveyfilled || 0) / modalData.view.survey_limit * 100).toFixed(1)}%</span>
                                     </div>
                                     <div className="w-full bg-gray-200 rounded-full h-2">
                                         <div 
                                             className={`h-2 rounded-full ${
-                                                (modalData.view.surveyfilled || 0) >= modalData.view.limit 
+                                                (modalData.view.surveyfilled || 0) >= modalData.view.survey_limit 
                                                     ? 'bg-red-500' 
-                                                    : ((modalData.view.surveyfilled || 0) / modalData.view.limit) >= 0.75
+                                                    : ((modalData.view.surveyfilled || 0) / modalData.view.survey_limit) >= 0.75
                                                     ? 'bg-yellow-500'
                                                     : 'bg-green-500'
                                             }`}
-                                            style={{ width: `${Math.min(((modalData.view.surveyfilled || 0) / modalData.view.limit * 100), 100)}%` }}
+                                            style={{ width: `${Math.min(((modalData.view.surveyfilled || 0) / modalData.view.survey_limit * 100), 100)}%` }}
                                         />
                                     </div>
                                 </div>
@@ -691,10 +691,10 @@ const AllZones = () => {
                                 type="number"
                                 step="1"
                                 min="0"
-                                value={editFormData.limit} 
-                                onChange={(e) => setEditFormData({...editFormData, limit: e.target.value})} 
+                                value={editFormData.survey_limit} 
+                                onChange={(e) => setEditFormData({...editFormData, survey_limit: e.target.value})} 
                                 disabled={isSubmitting}
-                                placeholder="Enter survey limit"
+                                placeholder="Enter survey survey_limit"
                             />
                         </label>
                     </div>

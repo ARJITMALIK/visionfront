@@ -36,7 +36,7 @@ import {
 import { VisionBase } from '@/utils/axiosInstance';
 
 // ===================================================================================
-// MODERN UI COMPONENTS (Keep all existing UI components as is)
+// MODERN UI COMPONENTS
 // ===================================================================================
 
 const Card = ({ children, className = "" }) => (
@@ -343,7 +343,7 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
 };
 
 // ===================================================================================
-// TOAST NOTIFICATION (Simple implementation)
+// TOAST NOTIFICATION
 // ===================================================================================
 const toast = {
     success: (message) => alert(message),
@@ -376,6 +376,7 @@ const AllSurveyData = () => {
     const [deleteModalData, setDeleteModalData] = useState(null);
     const [bulkDeleteModalData, setBulkDeleteModalData] = useState(null);
     const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     // State for pagination
     const [currentPage, setCurrentPage] = useState(1);
@@ -490,6 +491,7 @@ const AllSurveyData = () => {
                 otMobile: item.ot_mobile,
                 otProfile: item.ot_profile,
                 zcName: item.ot_parent_name || 'N/A',
+                zoneName: item.zone_name || 'N/A',
                 zcMobile: item.ot_parent_mobile,
                 zcProfile: item.ot_parent_profile,
                 zone: item.location ? item.location.split(',')[0].trim() : 'Unknown', 
@@ -613,10 +615,24 @@ const AllSurveyData = () => {
         }
     };
 
-    const confirmDelete = () => {
-        console.log("Deleting record:", deleteModalData);
-        setDeleteModalData(null);
-        fetchSurveys();
+    // Individual delete handler
+    const confirmDelete = async () => {
+        if (!deleteModalData) return;
+        
+        setIsDeleting(true);
+        try {
+            await VisionBase.delete(`/survey/${deleteModalData.id}`);
+
+            setSurveyData(prev => prev.filter(s => s.id !== deleteModalData.id));
+            setSelectedRows(prev => prev.filter(id => id !== deleteModalData.id));
+            setDeleteModalData(null);
+            toast.success(`Successfully deleted survey #${deleteModalData.id}.`);
+        } catch (err) {
+            console.error("Failed to delete survey:", err);
+            toast.error(err.response?.data?.message || "Failed to delete survey. Please try again.");
+        } finally {
+            setIsDeleting(false);
+        }
     };
 
     const handleRefresh = () => fetchSurveys();
@@ -873,14 +889,15 @@ const AllSurveyData = () => {
                                             <div className="bg-gray-50 rounded-xl p-4 border border-gray-100"><span className="text-sm text-gray-600">Citizen Mobile</span><p className="font-semibold text-gray-900">{viewModalData.mobile}</p></div>
                                             <div className="bg-gray-50 rounded-xl p-4 border border-gray-100"><span className="text-sm text-gray-600">Duration</span><p className="font-semibold text-gray-900">{viewModalData.duration}</p></div>
                                             <div className="bg-gray-50 rounded-xl p-4 border border-gray-100"><span className="text-sm text-gray-600">Date</span><p className="font-semibold text-gray-900">{viewModalData.date}</p></div>
-                                            <div className="bg-gray-50 rounded-xl p-4 border border-gray-100"><span className="text-sm text-gray-600">OT ID</span><p className="font-semibold text-gray-900">{viewModalData.ot_id}</p></div>
-                                            <div className="bg-gray-50 rounded-xl p-4 border border-gray-100"><span className="text-sm text-gray-600">Booth ID</span><p className="font-semibold text-gray-900">{viewModalData.booth_id}</p></div>
+                                            <div className="bg-gray-50 rounded-xl p-4 border border-gray-100"><span className="text-sm text-gray-600">OT</span><p className="font-semibold text-gray-900">{viewModalData.otName}</p></div>
+                                            <div className="bg-gray-50 rounded-xl p-4 border border-gray-100"><span className="text-sm text-gray-600">ZC</span><p className="font-semibold text-gray-900">{viewModalData.zcName}</p></div>
+                                            <div className="bg-gray-50 rounded-xl p-4 border border-gray-100"><span className="text-sm text-gray-600">Booth </span><p className="font-semibold text-gray-900">{viewModalData.zoneName}</p></div>
                                             <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 sm:col-span-2"><span className="text-sm text-gray-600">Full Location</span><p className="font-semibold text-gray-900 text-sm">{viewModalData.full_location}</p></div>
                                         </div>
                                         {viewModalData.sur_data?.length > 0 && (
                                             <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
                                                 <h4 className="text-md font-semibold text-gray-800 mb-3">Survey Responses</h4>
-                                                <div className="space-y-3 max-h-[300px] overflow-y-auto p-1 pr-2">
+                                                <div className="space-y-3 max-h-[500px] overflow-y-auto p-1 pr-2">
                                                     {viewModalData.sur_data.map((item, index) => (
                                                         <div key={index} className="bg-gradient-to-r from-violet-50 to-purple-50 rounded-xl p-4 border border-violet-100/80"><p className="text-sm font-semibold text-violet-700">Q: {item.question}</p><p className="text-sm text-gray-800 mt-1">A: {item.answer}</p></div>
                                                     ))}
@@ -920,8 +937,11 @@ const AllSurveyData = () => {
                         </div>
                     </DialogBody>
                     <DialogFooter>
-                        <Button variant="secondary" onClick={() => setDeleteModalData(null)}>Cancel</Button>
-                        <Button variant="destructive" onClick={confirmDelete}>Delete</Button>
+                        <Button variant="secondary" onClick={() => setDeleteModalData(null)} disabled={isDeleting}>Cancel</Button>
+                        <Button variant="destructive" onClick={confirmDelete} disabled={isDeleting}>
+                            {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            {isDeleting ? 'Deleting...' : 'Delete'}
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
