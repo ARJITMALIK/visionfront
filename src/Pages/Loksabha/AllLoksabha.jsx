@@ -448,7 +448,7 @@ const AllLoksabha = () => {
     }
     
     return (
-        <div className="min-h-screen bg-[#FEFBFB] p-4 sm:p-6 lg:p-8 font-sans">
+        <div className="min-h-screen bg-[#FEFBFB] font-sans">
             <Toaster richColors position="top-right" />
             <div className="max-w-7xl mx-auto">
                 <header className="flex justify-between items-center mb-4">

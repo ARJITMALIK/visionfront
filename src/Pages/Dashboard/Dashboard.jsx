@@ -10,8 +10,7 @@ import {
   Home, BookOpen, Droplet, Award, Briefcase, Users2, Building, Flag,
   Rocket, Grid3x3, Vote, FileText
 } from 'lucide-react';
-import LiveTracking from './LiveTracking';
-import LiveMap from './LiveMap';
+
 
 // ===================================================================================
 // DUMMY API HANDLER
@@ -411,26 +410,14 @@ const Dashboard = () => {
             </div>
           </div>
           
-          {/* Tabs */}
-          <nav className="flex gap-2 bg-gray-100 p-1 rounded-lg mb-4">
-            <TabButton active={activeTab === 'surveys'} onClick={() => setActiveTab('surveys')} icon={BarChart3}>
-              Survey Analytics
-            </TabButton>
-            <TabButton active={activeTab === 'tracking'} onClick={() => setActiveTab('tracking')} icon={Navigation}>
-              Live Tracking
-            </TabButton>
-            <TabButton active={activeTab === 'livemap'} onClick={() => setActiveTab('livemap')} icon={MapPin}>
-              Live Survey Map
-            </TabButton>
-          </nav>
+         
         </div>
       </header>
 
       {/* Main Content */}
       <main className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {activeTab === 'surveys' && <SurveyDashboard />}
-        {activeTab === 'tracking' && <LiveTracking />}
-        {activeTab === 'livemap' && <LiveMap />}
+       
       </main>
 
       {/* Footer */}

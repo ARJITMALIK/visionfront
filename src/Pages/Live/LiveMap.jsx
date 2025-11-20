@@ -342,23 +342,17 @@ const LiveMap = () => {
   const totalZCs = new Set(surveyData.map(s => s.zcName)).size;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-violet-50 via-purple-50 to-pink-50 p-4 sm:p-6 lg:p-8">
+    <div className="min-h-screen ">
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-violet-200/20 to-purple-200/20 rounded-full blur-3xl animate-pulse"></div>
         <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-br from-pink-200/20 to-violet-200/20 rounded-full blur-3xl animate-pulse" style={{animationDelay: '2s'}}></div>
       </div>
 
       <div className="relative max-w-7xl mx-auto space-y-6">
-        <header className="mb-8">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-violet-700 to-purple-700 bg-clip-text text-transparent mb-1">Live Survey Map</h1>
-          <p className="text-gray-500">Interactive map displaying real-time survey locations across regions</p>
-        </header>
+       
 
         <Card>
-          <CardHeader>
-            <CardTitle className="text-2xl">Survey Location Viewer</CardTitle>
-            <p className="text-gray-600 text-sm">Visualizing survey data points grouped by field operators</p>
-          </CardHeader>
+       
           
           <CardContent className="space-y-6">
             {error && (
@@ -376,7 +370,7 @@ const LiveMap = () => {
                 {/* Statistics Cards */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <Card>
-                    <CardContent className="p-4 text-center">
+                    <CardContent className=" text-center">
                       <MapPin className="h-8 w-8 mx-auto mb-2 text-blue-600" />
                       <div className="text-2xl font-bold text-blue-600">
                         {isLoading ? '...' : totalPoints}
@@ -386,7 +380,7 @@ const LiveMap = () => {
                   </Card>
                   
                   <Card>
-                    <CardContent className="p-4 text-center">
+                    <CardContent className=" text-center">
                       <Users className="h-8 w-8 mx-auto mb-2 text-green-600" />
                       <div className="text-2xl font-bold text-green-600">
                         {isLoading ? '...' : totalOTs}
@@ -396,7 +390,7 @@ const LiveMap = () => {
                   </Card>
                   
                   <Card>
-                    <CardContent className="p-4 text-center">
+                    <CardContent className=" text-center">
                       <TrendingUp className="h-8 w-8 mx-auto mb-2 text-purple-600" />
                       <div className="text-2xl font-bold text-purple-600">
                         {isLoading ? '...' : totalZones}
@@ -406,7 +400,7 @@ const LiveMap = () => {
                   </Card>
                   
                   <Card>
-                    <CardContent className="p-4 text-center">
+                    <CardContent className=" text-center">
                       <Users className="h-8 w-8 mx-auto mb-2 text-orange-600" />
                       <div className="text-2xl font-bold text-orange-600">
                         {isLoading ? '...' : totalZCs}
@@ -419,10 +413,8 @@ const LiveMap = () => {
                 {/* Legend */}
                 {!isLoading && mapData.length > 0 && (
                   <div>
-                    <h3 className="text-lg font-semibold mb-3">Operator Distribution</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-48 overflow-y-auto">
                       {mapData.map((item) => {
-                        const percentage = totalPoints > 0 ? ((item.coordinates.length / totalPoints) * 100).toFixed(1) : 0;
                         return (
                           <div key={item.groupName} className="flex items-center space-x-2 bg-gray-50 p-2 rounded-lg">
                             <div 

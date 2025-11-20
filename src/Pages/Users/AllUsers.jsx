@@ -687,7 +687,7 @@ const AllUsers = () => {
     // 5. RENDER UI
     // ===================================================================================
     return (
-        <div className="min-h-screen bg-slate-50 p-4 lg:p-8 font-sans">
+        <div className="min-h-screen bg-slate-50  font-sans">
             
             {/* HEADER */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">

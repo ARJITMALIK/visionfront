@@ -284,8 +284,8 @@ const AllEmoji = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-violet-50 via-purple-50 to-pink-50 p-4 sm:p-6 lg:p-8 font-sans">
-            <header className="mb-8">
+        <div className="min-h-screen  font-sans">
+            <header className="mb-2">
                 <div className="flex items-center justify-between">
                     <div>
                         <h1 className="text-3xl font-bold bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent">

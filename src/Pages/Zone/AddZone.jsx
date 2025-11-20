@@ -113,7 +113,7 @@ const AddZone = () => {
 
             await VisionBase.post('/add-zone', submissionData);
 
-            navigate('/allbooths');
+            navigate('/allbooth');
         } catch (error) {
             console.error("Error submitting form:", error);
             alert(`Failed to add Booth. ${error.response?.data?.message || 'Please try again.'}`);
@@ -203,7 +203,7 @@ const AddZone = () => {
                                     </Select>
                                 </FormRow>
 
-                                <FormRow label="lat">
+                                <FormRow label="latitude">
                                     <Input
                                         name="lat"
                                         value={formData.lat}
@@ -215,7 +215,7 @@ const AddZone = () => {
                                     />
                                 </FormRow>
 
-                                <FormRow label="lon">
+                                <FormRow label="longitude">
                                     <Input
                                         name="lon"
                                         value={formData.lon}

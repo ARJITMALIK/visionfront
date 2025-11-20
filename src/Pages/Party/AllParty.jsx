@@ -22,7 +22,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { VisionBase } from '@/utils/axiosInstance';
 
-// Reusable Stat Card Component - Styled to perfectly match the image
+// Reusable Stat Card Component
 const StatCard = ({ title, value, icon: Icon, iconBgClass, textColorClass }) => (
     <Card className="shadow-sm">
         <CardContent className="p-4 flex items-center justify-between">
@@ -65,8 +65,16 @@ const AllParty = () => {
             const response = await VisionBase.get('/parties');
             const parties = response.data.data.rows;
             
-            setPartyData(parties);
-            setFilteredParties(parties);
+            // ---------------------------------------------------------
+            // CHANGE MADE HERE: Sort by party_id (Ascending)
+            // ---------------------------------------------------------
+            const sortedParties = parties.sort((a, b) => a.party_id - b.party_id);
+            
+            // If you want Descending (Newest first), use:
+            // const sortedParties = parties.sort((a, b) => b.party_id - a.party_id);
+            
+            setPartyData(sortedParties);
+            setFilteredParties(sortedParties);
         } catch (err) {
             console.error('Error fetching party data:', err);
             setError('Failed to load party data');
@@ -103,7 +111,7 @@ const AllParty = () => {
 
     // Calculate stats
     const totalParties = partyData.length;
-    const activeParties = totalParties; // Assuming all are active since there's no status in API
+    const activeParties = totalParties; 
     const inactiveParties = 0;
     
     const handleSelectAll = (checked) => {
@@ -152,7 +160,7 @@ const AllParty = () => {
             
             toast.success('Party updated successfully!');
             closeModal('edit');
-            fetchPartyData(); // Refresh the data
+            fetchPartyData(); 
         } catch (error) {
             console.error('Error updating party:', error);
             toast.error(error.response?.data?.message || 'Failed to update party. Please try again.');
@@ -169,7 +177,7 @@ const AllParty = () => {
             
             toast.success(`Party "${modalData.delete.party_name}" deleted successfully!`);
             closeModal('delete');
-            fetchPartyData(); // Refresh the data
+            fetchPartyData(); 
         } catch (error) {
             console.error('Error deleting party:', error);
             toast.error(error.response?.data?.message || 'Failed to delete party. Please try again.');
@@ -201,7 +209,7 @@ const AllParty = () => {
             setSelectedRows([]);
             closeModal('bulkDelete');
             toast.success(`Successfully deleted ${idsToDelete.length} party/parties.`);
-            fetchPartyData(); // Refresh the data
+            fetchPartyData(); 
         } catch (error) {
             console.error("Failed to delete parties:", error);
             toast.error(error.response?.data?.message || "Failed to delete parties. Please try again.");
@@ -248,7 +256,7 @@ const AllParty = () => {
     }
 
     return (
-        <div className="bg-gray-50/50 min-h-screen p-4 sm:p-6 lg:p-8">
+        <div className="bg-gray-50/50 min-h-screen">
             <Toaster richColors position="top-right" />
             <div className="max-w-full mx-auto">
                 {/* Header */}
