@@ -36,6 +36,7 @@ import {
 } from 'lucide-react';
 import { VisionBase } from '@/utils/axiosInstance';
 import { useNavigate } from 'react-router-dom';
+import * as XLSX from 'xlsx';
 
 // ===================================================================================
 // MODERN UI COMPONENTS
@@ -413,11 +414,11 @@ const AllSurveyData = () => {
         
         try {
             const payload = {
-                context: surveyData,
+                context: surveyData.sur_data,
                 prompt: "The provided data is survey taken by our team member, to know data authenticity i want to know how much the data is correctly filled(correctness in percentage) , to know fake survey data there may be illogical answer choosed , example for question:who will you vote for and the answer choosed is BJP and then next question is which candidate you will choose and you choosed rahul gandhi but it is from congress means the data is incorrect and filled by team member on his own. Please analyze the survey responses for logical consistency and provide a detailed authenticity report with percentage score. only give percentage as single answer so that i can directly store it in a variable"
             };
 
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=AIzaSyAQ9Tir9iFm0YJESYMrOGJpcDklwn8WUBM`, {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=AIzaSyARzsNUoYuIcZzzsqCIpRxQZWVomCOkIYM`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -628,7 +629,181 @@ const AllSurveyData = () => {
         setActiveSearchQuery("");
     };
     
-    const handleExport = (type) => { console.log(`Exporting ${type} CSV with selected rows:`, selectedRows); };
+    // State for export loading
+    const [isExporting, setIsExporting] = useState(false);
+
+    // Enhanced Excel Export Function for Large Datasets
+    const handleExport = async (type) => {
+        setIsExporting(true);
+        
+        try {
+            console.log('Starting export, type:', type, 'Selected rows:', selectedRows);
+            
+            // Check if XLSX is available
+            if (typeof XLSX === 'undefined') {
+                console.error('XLSX library not found');
+                alert("Excel library not loaded. Please refresh the page and try again.");
+                setIsExporting(false);
+                return;
+            }
+            
+            console.log('XLSX library found:', XLSX);
+            
+            // Determine which data to export
+            let dataToExport = [];
+            if (type === 'selected') {
+                if (selectedRows.length === 0) {
+                    alert("No rows selected for export.");
+                    setIsExporting(false);
+                    return;
+                }
+                dataToExport = surveyData.filter(item => selectedRows.includes(item.id));
+            } else {
+                dataToExport = filteredData;
+            }
+            
+            console.log('Data to export count:', dataToExport.length);
+            
+            if (dataToExport.length === 0) {
+                alert("No data to export.");
+                setIsExporting(false);
+                return;
+            }
+            
+            // Show warning for large exports
+            if (dataToExport.length > 1000) {
+                const proceed = window.confirm(
+                    `You are about to export ${dataToExport.length} records. This may take a few moments. Continue?`
+                );
+                if (!proceed) {
+                    setIsExporting(false);
+                    return;
+                }
+            }
+            
+            // Allow UI to update before heavy processing
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            // Collect all unique questions across all surveys (optimized)
+            const allQuestionsMap = new Map();
+            let questionOrder = [];
+            
+            for (let i = 0; i < dataToExport.length; i++) {
+                const item = dataToExport[i];
+                if (item.sur_data && Array.isArray(item.sur_data)) {
+                    for (let j = 0; j < item.sur_data.length; j++) {
+                        const qa = item.sur_data[j];
+                        if (qa.question && !allQuestionsMap.has(qa.question)) {
+                            allQuestionsMap.set(qa.question, true);
+                            questionOrder.push(qa.question);
+                        }
+                    }
+                }
+            }
+            
+            console.log('Unique questions found:', questionOrder.length);
+            
+            // Process data in chunks for better performance
+            const CHUNK_SIZE = 500;
+            const excelData = [];
+            
+            for (let i = 0; i < dataToExport.length; i += CHUNK_SIZE) {
+                const chunk = dataToExport.slice(i, i + CHUNK_SIZE);
+                
+                chunk.forEach(item => {
+                    // Base information
+                    const row = {
+                        'Survey ID': item.id,
+                        'Citizen Name': item.name,
+                        'Mobile': item.mobile,
+                        'OT Name': item.otName,
+                        'OT Mobile': item.otMobile,
+                        'ZC Name': item.zcName,
+                        'ZC Mobile': item.zcMobile,
+                        'Zone/Booth': item.zoneName,
+                        'Location': item.full_location,
+                        'Date': item.date,
+                        'Duration': item.duration
+                    };
+                    
+                    // Create answer map for quick lookup
+                    const answerMap = new Map();
+                    if (item.sur_data && Array.isArray(item.sur_data)) {
+                        item.sur_data.forEach(qa => {
+                            if (qa.question) {
+                                answerMap.set(qa.question, qa.answer || 'N/A');
+                            }
+                        });
+                    }
+                    
+                    // Add each question column with its answer
+                    questionOrder.forEach(question => {
+                        row[question] = answerMap.get(question) || 'N/A';
+                    });
+                    
+                    excelData.push(row);
+                });
+                
+                // Allow UI to remain responsive during processing
+                if (i + CHUNK_SIZE < dataToExport.length) {
+                    await new Promise(resolve => setTimeout(resolve, 0));
+                }
+            }
+            
+            console.log('Excel data formatted, rows:', excelData.length);
+            
+            // Create workbook and worksheet with optimizations
+            const worksheet = XLSX.utils.json_to_sheet(excelData, {
+                cellDates: false,
+                skipHeader: false,
+                dense: false
+            });
+            
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'Survey Data');
+            
+            // Auto-size columns (optimized for large datasets)
+            const maxWidth = 50;
+            const minWidth = 10;
+            const sampleSize = Math.min(100, excelData.length); // Only sample first 100 rows for sizing
+            
+            const colWidths = Object.keys(excelData[0] || {}).map(key => {
+                const headerLength = key.length;
+                const sampleData = excelData.slice(0, sampleSize);
+                const maxContentLength = Math.max(
+                    headerLength,
+                    ...sampleData.map(row => String(row[key] || '').length)
+                );
+                return { wch: Math.min(Math.max(maxContentLength + 2, minWidth), maxWidth) };
+            });
+            worksheet['!cols'] = colWidths;
+            
+            // Generate filename with timestamp
+            const timestamp = new Date().toISOString().slice(0, 10);
+            const filename = `survey_data_${type}_${timestamp}.xlsx`;
+            
+            console.log('Attempting to write file:', filename);
+            
+            // Export file with compression for large files
+            const writeOptions = {
+                bookType: 'xlsx',
+                bookSST: false,
+                type: 'binary',
+                compression: true
+            };
+            
+            XLSX.writeFile(workbook, filename, writeOptions);
+            
+            console.log('Export completed successfully');
+            alert(`Successfully exported ${dataToExport.length} record(s) to Excel with ${questionOrder.length} question columns!`);
+        } catch (error) {
+            console.error('Export error details:', error);
+            alert(`Failed to export data: ${error.message}`);
+        } finally {
+            setIsExporting(false);
+        }
+    };
+    
     const handleViewClick = (rowData) => {
         setViewModalData(rowData);
         setAnalysisData(null);
@@ -703,7 +878,9 @@ const AllSurveyData = () => {
             totalZcs,
         };
     }, [surveyData]);
-const navigate = useNavigate();
+    
+    const navigate = useNavigate();
+    
     return (
         <div className="min-h-screen font-sans">
             <div className="fixed inset-0 overflow-hidden pointer-events-none">
@@ -729,19 +906,26 @@ const navigate = useNavigate();
                     <CardHeader className="flex flex-wrap justify-between items-center gap-4">
                         <CardTitle>All Survey Records ({filteredData.length} matches)</CardTitle>
                         <div className="flex items-center space-x-2">
-                           <Button onClick={() => handleExport('all')} variant="outline" size="md" disabled={loading}><Download className="h-4 w-4 mr-2"/>Export All</Button>
-                           <Button onClick={() => handleExport('selected')} variant="outline" size="md" disabled={selectedRows.length === 0}><Download className="h-4 w-4 mr-2"/>Export Selected</Button>
+                           <Button onClick={() => handleExport('all')} variant="outline" size="md" disabled={loading || isExporting}>
+                               {isExporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin"/> : <Download className="h-4 w-4 mr-2"/>}
+                               {isExporting ? 'Exporting...' : 'Export All'}
+                           </Button>
+                           <Button onClick={() => handleExport('selected')} variant="outline" size="md" disabled={selectedRows.length === 0 || isExporting}>
+                               {isExporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin"/> : <Download className="h-4 w-4 mr-2"/>}
+                               {isExporting ? 'Exporting...' : 'Export Selected'}
+                           </Button>
                            {selectedRows.length > 0 && (
                                <Button 
                                    onClick={handleBulkDeleteClick} 
                                    variant="destructive" 
                                    size="md"
+                                   disabled={isExporting}
                                >
                                    <Trash2 className="h-4 w-4 mr-2"/>
                                    Delete Selected ({selectedRows.length})
                                </Button>
                            )}
-                           <Button onClick={handleRefresh} variant="ghost" size="icon" disabled={loading}><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`}/></Button>
+                           <Button onClick={handleRefresh} variant="ghost" size="icon" disabled={loading || isExporting}><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`}/></Button>
                         </div>
                     </CardHeader>
                     <CardContent>
