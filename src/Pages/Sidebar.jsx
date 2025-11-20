@@ -3,11 +3,18 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, ChevronDown, Users, Smile, Vote, Database, 
   FileText, Briefcase, MapPin, Blocks, User, Bell, Landmark, Building2,
-  Home
+  Home,
+  EarthIcon
 } from 'lucide-react';
 
 const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
+  {
+    label: 'Live Tracking',
+    icon: EarthIcon,
+    basePath: '/teamtrack',
+    subItems: [{ label: 'Team tracking', href: '/teamtrack' },{ label: 'live survey map', href: '/livemap' }]
+  },
   {
     label: 'Users',
     icon: Users,

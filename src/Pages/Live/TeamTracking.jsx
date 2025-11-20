@@ -119,7 +119,7 @@ const UserTreeNode = ({ node, onSelect, depth = 0 }) => {
 
 // --- Main Component ---
 
-const LiveTracking = () => {
+const TeamTracking = () => {
   // --- State Management ---
   const [users, setUsers] = useState([]);
   const [usersById, setUsersById] = useState(new Map());
@@ -309,7 +309,7 @@ const LiveTracking = () => {
   const parentUser = selectedUser ? usersById.get(selectedUser.parent) : null;
 
   return (
-    <div className="w-full h-screen flex bg-gray-100 font-sans overflow-hidden">
+    <div className="w-full h-screen p-8 flex bg-gray-100 font-sans overflow-hidden">
       {/* Map Area */}
       <div className="flex-1 relative h-full">
         <div ref={mapRef} className="w-full h-full z-0" />
@@ -550,4 +550,4 @@ const UserDetailsPanel = ({ user, parent, onBack, onClose }) => {
     );
 };
 
-export default LiveTracking;
+export default TeamTracking;

@@ -32,6 +32,8 @@ import AddDistricts from './Pages/Districts/AddDistricts';
 import AllDistricts from './Pages/Districts/AllDistricts';
 import AddLoksabha from './Pages/Loksabha/AddLoksabha';
 import AllLoksabha from './Pages/Loksabha/AllLoksabha';
+import TeamTracking from './Pages/Live/TeamTracking';
+import LiveMap from './Pages/Live/LiveMap';
 
 
 const App = () => {
@@ -51,7 +53,8 @@ const App = () => {
               <Routes>
                 {/* Define all your layout-based pages here */}
                 <Route path="/dashboard" element={<Dashboard />} />
-
+                <Route path="/teamtrack" element={<TeamTracking />} />
+                <Route path="/livemap" element={<LiveMap/>} />
                 <Route path="/allusers" element={<AllUsers />} />
                 <Route path="/addemoji" element={<AddEmoji />} />
                 <Route path="/allemoji" element={<AllEmoji />} />

@@ -31,9 +31,11 @@ import {
   Brain,
   CheckCircle,
   AlertTriangle,
-  XCircle
+  XCircle,
+  ChevronUp
 } from 'lucide-react';
 import { VisionBase } from '@/utils/axiosInstance';
+import { useNavigate } from 'react-router-dom';
 
 // ===================================================================================
 // MODERN UI COMPONENTS
@@ -94,11 +96,17 @@ const Button = ({ children, className = "", variant = "primary", size = "md", on
     );
 };
 
-const Select = ({ value, onValueChange, children, placeholder = "Select..." }) => {
+// Updated Select Component to handle Direction (Up/Down)
+const Select = ({ value, onValueChange, children, placeholder = "Select...", direction = "down" }) => {
     const [isOpen, setIsOpen] = useState(false);
     const options = React.Children.toArray(children);
     const selectedOption = options.find(child => child.props.value === value);
     
+    // Position logic
+    const positionClasses = direction === "up" 
+        ? "bottom-full mb-2 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.1)]" 
+        : "mt-1 shadow-2xl";
+
     return (
         <div className="relative">
             <button
@@ -110,7 +118,11 @@ const Select = ({ value, onValueChange, children, placeholder = "Select..." }) =
                     {selectedOption ? selectedOption.props.children : placeholder}
                 </span>
                 <span className="absolute inset-y-0 right-0 flex items-center pr-3">
-                    <ChevronRight className={`h-4 w-4 text-gray-400 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+                    {direction === 'up' ? (
+                         <ChevronUp className={`h-4 w-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                    ) : (
+                         <ChevronRight className={`h-4 w-4 text-gray-400 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+                    )}
                 </span>
             </button>
             
@@ -120,7 +132,7 @@ const Select = ({ value, onValueChange, children, placeholder = "Select..." }) =
                         className="fixed inset-0 z-40" 
                         onClick={() => setIsOpen(false)}
                     />
-                    <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-2xl max-h-60 overflow-auto">
+                    <div className={`absolute z-50 w-full bg-white border border-gray-200 rounded-xl max-h-60 overflow-auto ${positionClasses}`}>
                         {options.map((option, index) => (
                             <button
                                 key={index}
@@ -186,7 +198,7 @@ const DatePicker = ({ selected, onSelect, placeholder = "Select date" }) => {
                 onClick={() => setIsOpen(!isOpen)}
             >
                 <Calendar className="h-4 w-4 mr-2 text-gray-400" />
-                <span className="text-sm text-gray-700">
+                <span className="text-sm text-gray-700 block truncate">
                     {selected ? formatDate(selected) : placeholder}
                 </span>
             </button>
@@ -361,12 +373,16 @@ const AllSurveyData = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     
-    // State for form filters
-    const [filters, setFilters] = useState({ zone: 'all', ot: 'all', zc: 'all' });
+    // State for form filters (REMOVED ZONE, added ZC first)
+    const [filters, setFilters] = useState({ zc: 'all', ot: 'all' });
+    const [searchQuery, setSearchQuery] = useState(""); 
     const [dateFrom, setDateFrom] = useState(null);
     const [dateTo, setDateTo] = useState(null);
+    
+    // Active filters (applied on click of Search)
     const [activeFilters, setActiveFilters] = useState(filters);
     const [activeDateRange, setActiveDateRange] = useState({ from: null, to: null });
+    const [activeSearchQuery, setActiveSearchQuery] = useState("");
 
     // State for table selections
     const [selectedRows, setSelectedRows] = useState([]);
@@ -383,7 +399,7 @@ const AllSurveyData = () => {
     const [rowsPerPage, setRowsPerPage] = useState(10);
     
     // State for derived filter options
-    const [filterOptions, setFilterOptions] = useState({ zones: [], ots: [], zcs: [] });
+    const [filterOptions, setFilterOptions] = useState({ zcs: [], ots: [] });
 
     // State for AI analysis
     const [analysisData, setAnalysisData] = useState(null);
@@ -509,7 +525,7 @@ const AllSurveyData = () => {
             
             // Sort surveys by ID in ascending order
             const sortedData = transformedData.sort((a, b) => parseInt(a.id) - parseInt(b.id));
-            setSurveyData(sortedData);
+            setSurveyData(sortedData.reverse());
         } catch (err) {
             setError(err.message || 'Failed to fetch survey data. Please check your API endpoint.');
             console.error('Error fetching surveys:', err);
@@ -521,32 +537,57 @@ const AllSurveyData = () => {
 
     useEffect(() => { fetchSurveys(); }, []);
     
-    // Effect to derive filter options from data
+    // Effect to derive BASE filter options from data
     useEffect(() => {
         if (surveyData.length > 0) {
-            const zones = [...new Set(surveyData.map(d => d.zone).filter(Boolean))].sort();
-            const ots = [...new Set(surveyData.map(d => d.otName).filter(Boolean))].sort();
             const zcs = [...new Set(surveyData.map(d => d.zcName).filter(Boolean))].sort();
-            setFilterOptions({ zones, ots, zcs });
+            const ots = [...new Set(surveyData.map(d => d.otName).filter(Boolean))].sort();
+            setFilterOptions({ zcs, ots });
         }
     }, [surveyData]);
+
+    // Derive Available OT options based on selected ZC
+    const dynamicOtOptions = useMemo(() => {
+        if (filters.zc === 'all') {
+            return filterOptions.ots;
+        }
+        // Only show OTs that belong to the selected ZC
+        const filteredOts = new Set(
+            surveyData
+                .filter(d => d.zcName === filters.zc)
+                .map(d => d.otName)
+                .filter(Boolean)
+        );
+        return [...filteredOts].sort();
+    }, [filters.zc, surveyData, filterOptions.ots]);
     
-    // Memoized filtered data
+    // Memoized filtered data (Updated: Removed Zone, Added ZC logic)
     const filteredData = useMemo(() => {
         return surveyData.filter(item => {
-            const { zone, ot, zc } = activeFilters;
-            const { from, to } = activeDateRange;
+            const { zc, ot } = activeFilters;
+            
+            // 1. ZC Filter
+            const zcMatch = zc === 'all' || item.zcName === zc;
+            
+            // 2. OT Filter
+            const otMatch = ot === 'all' || item.otName === ot;
 
+            // 3. Date Range Filter
+            const { from, to } = activeDateRange;
             const itemDate = item.originalDate;
             const dateMatch = (!from || itemDate >= from) && (!to || itemDate <= to);
             
-            const zoneMatch = zone === 'all' || item.zone === zone;
-            const otMatch = ot === 'all' || item.otName === ot;
-            const zcMatch = zc === 'all' || item.zcName === zc;
+            // 4. Search Query Filter
+            const searchLower = activeSearchQuery.toLowerCase();
+            const searchMatch = !activeSearchQuery || 
+                (item.name && item.name.toLowerCase().includes(searchLower)) ||
+                (item.mobile && item.mobile.includes(searchLower)) ||
+                (item.id && item.id.includes(searchLower)) ||
+                (item.otName && item.otName.toLowerCase().includes(searchLower));
 
-            return dateMatch && zoneMatch && otMatch && zcMatch;
+            return zcMatch && otMatch && dateMatch && searchMatch;
         });
-    }, [surveyData, activeFilters, activeDateRange]);
+    }, [surveyData, activeFilters, activeDateRange, activeSearchQuery]);
 
     const totalPages = Math.ceil(filteredData.length / rowsPerPage);
     const paginatedData = filteredData.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
@@ -557,22 +598,34 @@ const AllSurveyData = () => {
 
     const handleSelectAll = (checked) => setSelectedRows(checked ? paginatedData.map(row => row.id) : []);
     const handleSelectRow = (id) => setSelectedRows(prev => prev.includes(id) ? prev.filter(rowId => rowId !== id) : [...prev, id]);
-    const handleFilterChange = (name, value) => setFilters(prev => ({ ...prev, [name]: value }));
+    
+    // Special handler for ZC change to reset OT if it becomes invalid
+    const handleFilterChange = (name, value) => {
+        if (name === 'zc') {
+            setFilters(prev => ({ ...prev, zc: value, ot: 'all' }));
+        } else {
+            setFilters(prev => ({ ...prev, [name]: value }));
+        }
+    };
     
     // Search and Reset handlers
     const handleSearch = () => {
         setActiveFilters(filters);
         const toDateWithTime = dateTo ? new Date(dateTo.setHours(23, 59, 59, 999)) : null;
         setActiveDateRange({ from: dateFrom, to: toDateWithTime });
+        setActiveSearchQuery(searchQuery); 
     };
 
     const handleResetFilters = () => {
-        const initialFilters = { zone: 'all', ot: 'all', zc: 'all' };
+        const initialFilters = { zc: 'all', ot: 'all' };
         setFilters(initialFilters);
         setDateFrom(null); 
         setDateTo(null);
+        setSearchQuery("");
+        
         setActiveFilters(initialFilters);
         setActiveDateRange({ from: null, to: null });
+        setActiveSearchQuery("");
     };
     
     const handleExport = (type) => { console.log(`Exporting ${type} CSV with selected rows:`, selectedRows); };
@@ -650,9 +703,9 @@ const AllSurveyData = () => {
             totalZcs,
         };
     }, [surveyData]);
-
+const navigate = useNavigate();
     return (
-        <div className="min-h-screen bg-gradient-to-br from-violet-50 via-purple-50 to-pink-50 p-4 sm:p-6 lg:p-8 font-sans">
+        <div className="min-h-screen font-sans">
             <div className="fixed inset-0 overflow-hidden pointer-events-none">
                 <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-violet-200/20 to-purple-200/20 rounded-full blur-3xl animate-pulse"></div>
                 <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-br from-pink-200/20 to-violet-200/20 rounded-full blur-3xl animate-pulse" style={{animationDelay: '2s'}}></div>
@@ -693,19 +746,44 @@ const AllSurveyData = () => {
                     </CardHeader>
                     <CardContent>
                         {/* Filter Card */}
-                        <div className="bg-gray-50/70 border border-gray-200/50 rounded-xl p-4 mb-6">
+                        <div className="bg-gray-50/70 border border-gray-200/50 rounded-xl mb-6 p-4">
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-                               <div className="xl:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                  <DatePicker selected={dateFrom} onSelect={setDateFrom} placeholder="Date From"/>
-                                  <DatePicker selected={dateTo} onSelect={setDateTo} placeholder="Date To"/>
-                               </div>
-                               <Select value={filters.zone} onValueChange={(v) => handleFilterChange('zone', v)} placeholder="All Zones"><SelectItem value="all">All Zones</SelectItem>{filterOptions.zones.map(z => <SelectItem key={z} value={z}>{z}</SelectItem>)}</Select>
-                               <Select value={filters.ot} onValueChange={(v) => handleFilterChange('ot', v)} placeholder="All OTs"><SelectItem value="all">All OTs</SelectItem>{filterOptions.ots.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</Select>
-                               <Select value={filters.zc} onValueChange={(v) => handleFilterChange('zc', v)} placeholder="All ZCs"><SelectItem value="all">All ZCs</SelectItem>{filterOptions.zcs.map(z => <SelectItem key={z} value={z}>{z}</SelectItem>)}</Select>
-                               <div className="flex items-center space-x-2">
-                                  <Button onClick={handleSearch} className="w-full"><Search className="h-4 w-4 mr-2"/>Search</Button>
-                                  <Button onClick={handleResetFilters} variant="ghost" size="icon"><ListRestart className="h-4 w-4"/></Button>
-                               </div>
+                                {/* Search Bar */}
+                                <div className="sm:col-span-2 lg:col-span-1 xl:col-span-2 relative">
+                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <Search className="h-4 w-4 text-gray-400" />
+                                    </div>
+                                    <input
+                                        type="text"
+                                        className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-violet-400 focus:border-violet-400 outline-none shadow-sm transition-all"
+                                        placeholder="Search Name, Mobile, ID..."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                    />
+                                </div>
+
+                                {/* Date Filters */}
+                                <div className="sm:col-span-2 lg:col-span-2 xl:col-span-2 grid grid-cols-2 gap-2">
+                                  <DatePicker selected={dateFrom} onSelect={setDateFrom} placeholder="From Date"/>
+                                  <DatePicker selected={dateTo} onSelect={setDateTo} placeholder="To Date"/>
+                                </div>
+
+                                {/* ZC and OT Filters (Reordered & Cascading) */}
+                                <Select value={filters.zc} onValueChange={(v) => handleFilterChange('zc', v)} placeholder="Select ZC">
+                                    <SelectItem value="all">All ZCs</SelectItem>
+                                    {filterOptions.zcs.map(z => <SelectItem key={z} value={z}>{z}</SelectItem>)}
+                                </Select>
+                                
+                                <Select value={filters.ot} onValueChange={(v) => handleFilterChange('ot', v)} placeholder="Select OT">
+                                    <SelectItem value="all">All OTs</SelectItem>
+                                    {dynamicOtOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                                </Select>
+                                
+                                {/* Action Buttons */}
+                                <div className="flex items-center space-x-2 sm:col-span-2 lg:col-span-1 xl:col-span-6 xl:justify-end">
+                                  <Button onClick={handleSearch} className="w-full sm:w-auto px-8"><Search className="h-4 w-4 mr-2"/>Apply Filters</Button>
+                                  <Button onClick={handleResetFilters} variant="secondary" className="w-full sm:w-auto"><ListRestart className="h-4 w-4 mr-2"/>Reset</Button>
+                                </div>
                             </div>
                         </div>
 
@@ -736,7 +814,7 @@ const AllSurveyData = () => {
                                                 <td className="px-6 py-4 text-sm font-medium text-gray-900">{row.name}</td>
                                                 <td className="px-6 py-4 text-sm text-gray-700">{row.otName}</td>
                                                 <td className="px-6 py-4 text-sm text-gray-700">{row.zcName}</td>
-                                                <td className="px-6 py-4"><span className="inline-flex items-center px-3 py-1 text-xs font-medium bg-gradient-to-r from-blue-100 to-blue-200 text-blue-800 rounded-full border border-blue-200"><MapPin className="h-3 w-3 mr-1" />{row.zone}</span></td>
+                                                <td onClick={()=>navigate('/livemap')} className="px-6 py-4 cursor-pointer"><span className="inline-flex items-center px-3 py-1 text-xs font-medium bg-gradient-to-r from-blue-100 to-blue-200 text-blue-800 rounded-full border border-blue-200"><MapPin className="h-3 w-3 mr-1" />{row.zoneName}</span></td>
                                                 <td className="px-6 py-4"><span className="inline-flex items-center px-3 py-1 text-xs font-medium bg-gradient-to-r from-orange-100 to-orange-200 text-orange-800 rounded-full border border-orange-200"><Clock className="h-3 w-3 mr-1" />{row.date}</span></td>
                                                 <td className="px-6 py-4"><div className="flex space-x-2"><Button variant="outline" size="icon" onClick={() => handleViewClick(row)} className="h-8 w-8"><Eye className="h-4 w-4"/></Button><Button variant="destructive" size="icon" onClick={() => handleDeleteClick(row)} className="h-8 w-8"><Trash2 className="h-4 w-4"/></Button></div></td>
                                             </tr>
@@ -747,11 +825,16 @@ const AllSurveyData = () => {
                                 </table>
                             </div>
                             {/* Pagination */}
-                            <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex flex-wrap gap-4 justify-between items-center">
+                            <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex flex-wrap gap-4 justify-between items-center relative z-10">
                                 <div className="flex items-center space-x-2">
                                   <p className="text-sm text-gray-600">Rows per page:</p>
                                   <div className="w-20">
-                                    <Select value={rowsPerPage} onValueChange={(v) => setRowsPerPage(Number(v))}>
+                                    {/* Set direction="up" to fix the hiding behind border issue */}
+                                    <Select 
+                                        value={rowsPerPage} 
+                                        onValueChange={(v) => setRowsPerPage(Number(v))}
+                                        direction="up" 
+                                    >
                                         <SelectItem value={5}>5</SelectItem>
                                         <SelectItem value={10}>10</SelectItem>
                                         <SelectItem value={20}>20</SelectItem>
