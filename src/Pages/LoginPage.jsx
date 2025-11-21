@@ -96,7 +96,7 @@ const navigate = useNavigate();
                 />
                 <div className="text-left">
                   <h1 className="font-bold text-lg text-white leading-tight">VISION DATA</h1>
-                  <p className="text-blue-100 text-xs leading-tight">Powered by Abhasthra Technology</p>
+                  <p className="text-blue-100 text-xs leading-tight">Powered by Abhasthra Automation pvt ltd</p>
                 </div>
               </div>
               

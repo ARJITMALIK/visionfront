@@ -415,10 +415,38 @@ const AllSurveyData = () => {
         try {
             const payload = {
                 context: surveyData.sur_data,
-                prompt: "The provided data is survey taken by our team member, to know data authenticity i want to know how much the data is correctly filled(correctness in percentage) , to know fake survey data there may be illogical answer choosed , example for question:who will you vote for and the answer choosed is BJP and then next question is which candidate you will choose and you choosed rahul gandhi but it is from congress means the data is incorrect and filled by team member on his own. Please analyze the survey responses for logical consistency and provide a detailed authenticity report with percentage score. only give percentage as single answer so that i can directly store it in a variable"
+                prompt: `You are an expert survey data auditor for Assam (especially BTAD/BTR areas). Your task is to detect fake or fabricated survey entries filled by field team members instead of real respondents.
+
+Common signs of fake/fabricated data:
+- Severe logical contradictions (e.g., strongly likes only BJP but chooses Rahul Gandhi or Congress candidate, votes for one party but picks candidate from opposite party with no explanation)
+- Random or impossible answer patterns that no real voter would give
+- Repeated identical answers where variation is expected
+- Answers that ignore well-known local political realities of Bodoland/Assam
+
+Common signs of genuine data (even if some answers look odd):
+- Voters in BTAD often "like" multiple parties (BJP, UPPL, BPF, AGP, even INC) at the same time
+- Repeatedly writing "Hagrama" across parties is very common because Hagrama Mohilary is the most dominant local figure
+- Switching between UPPL and BPF is normal
+- Low education + unemployed youth + benefiting from Orunodoi/PM Kisan is typical
+
+Here is the survey data in JSON/array format:
+
+${JSON.stringify(surveyData.sur_data)}
+
+Please analyze the survey responses for logical consistency, taking into account the special political and social context of Assam/BTR.
+
+Provide:
+1. A short authenticity report (2-5 sentences) explaining your reasoning.
+2. Flag any minor or major inconsistencies.
+3. Finally, give only a single percentage score (0% to 100%) representing how authentic the data is (100% = completely genuine, 0% = clearly fabricated by team member).
+
+Important: At the very end of your response, on its own line, write only the percentage number like this:
+95%
+
+Nothing else after the percentage. This is so I can directly extract and store it in a variable.`
             };
 
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=AIzaSyARzsNUoYuIcZzzsqCIpRxQZWVomCOkIYM`, {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=asasqweadads`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
