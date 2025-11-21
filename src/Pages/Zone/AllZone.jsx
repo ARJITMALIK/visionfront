@@ -23,8 +23,8 @@ import { Input } from '@/components/ui/input';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from '@/components/ui/select';
-import { Label } from '@/components/ui/label'; // Assuming you have this, or use standard label
-import { Switch } from '@/components/ui/switch'; // Assuming you have this, or use checkbox
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 
 // Reusable Stat Card Component
 const StatCard = ({ title, value, icon: Icon, iconBgClass, textColorClass }) => (
@@ -59,16 +59,18 @@ const AllZones = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
 
-    // State for edit form
+    // State for edit form - UPDATED to include lat and lon
     const [editFormData, setEditFormData] = useState({ 
         zone_name: '',
         range: '',
-        survey_limit: ''
+        survey_limit: '',
+        lat: '',
+        lon: ''
     });
 
     // State for filters and search
     const [searchTerm, setSearchTerm] = useState('');
-    const [showCompletedOnly, setShowCompletedOnly] = useState(false); // NEW FILTER STATE
+    const [showCompletedOnly, setShowCompletedOnly] = useState(false);
     const [filters, setFilters] = useState({
         vidhan_name: '',
         lok_name: '',
@@ -184,7 +186,6 @@ const AllZones = () => {
     };
 
     const handleSelectAll = (checked) => {
-        // Selects all visible filtered rows (or switch to filteredZones.map to select all pages)
         setSelectedRows(checked ? filteredZones.map(d => d.zone_id) : []);
     };
 
@@ -197,9 +198,11 @@ const AllZones = () => {
     const openModal = (type, data) => {
         if (type === 'edit') {
             setEditFormData({ 
-                zone_name: data.zone_name,
+                zone_name: data.zone_name || '',
                 range: data.range || '',
-                survey_limit: data.survey_limit || ''
+                survey_limit: data.survey_limit || '',
+                lat: data.lat !== null && data.lat !== undefined ? data.lat : '',
+                lon: data.lon !== null && data.lon !== undefined ? data.lon : ''
             });
         }
         setModalData(prev => ({ ...prev, [type]: data }));
@@ -242,7 +245,19 @@ const AllZones = () => {
         }
 
         if (editFormData.survey_limit && (isNaN(editFormData.survey_limit) || editFormData.survey_limit < 0 || !Number.isInteger(Number(editFormData.survey_limit)))) {
-            toast.error("Please enter a valid survey survey_limit (must be a positive whole number).");
+            toast.error("Please enter a valid survey limit (must be a positive whole number).");
+            return;
+        }
+
+        // Validate lat
+        if (editFormData.lat && (isNaN(editFormData.lat) || editFormData.lat < -90 || editFormData.lat > 90)) {
+            toast.error("Please enter a valid lat (must be between -90 and 90).");
+            return;
+        }
+
+        // Validate lon
+        if (editFormData.lon && (isNaN(editFormData.lon) || editFormData.lon < -180 || editFormData.lon > 180)) {
+            toast.error("Please enter a valid lon (must be between -180 and 180).");
             return;
         }
 
@@ -251,7 +266,9 @@ const AllZones = () => {
             const payload = { 
                 zone_name: editFormData.zone_name,
                 range: editFormData.range ? Number(editFormData.range) : null,
-                survey_limit: editFormData.survey_limit ? Number(editFormData.survey_limit) : null
+                survey_limit: editFormData.survey_limit ? Number(editFormData.survey_limit) : null,
+                lat: editFormData.lat ? Number(editFormData.lat) : null,
+                lon: editFormData.lon ? Number(editFormData.lon) : null
             };
             await VisionBase.put(`/zone/${modalData.edit.zone_id}`, payload);
             
@@ -479,7 +496,24 @@ const AllZones = () => {
                                         <button onClick={() => setSearchTerm('')} className="ml-1 hover:text-blue-600">×</button>
                                     </span>
                                 )}
-                                {/* ... other filter badges ... */}
+                                {filters.vidhan_name && (
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-purple-100 text-purple-800">
+                                        Vidhan: {filters.vidhan_name}
+                                        <button onClick={() => updateFilter('vidhan_name', '')} className="ml-1 hover:text-purple-600">×</button>
+                                    </span>
+                                )}
+                                {filters.lok_name && (
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-orange-100 text-orange-800">
+                                        Lok: {filters.lok_name}
+                                        <button onClick={() => updateFilter('lok_name', '')} className="ml-1 hover:text-orange-600">×</button>
+                                    </span>
+                                )}
+                                {filters.state && (
+                                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-pink-100 text-pink-800">
+                                        State: {filters.state}
+                                        <button onClick={() => updateFilter('state', '')} className="ml-1 hover:text-pink-600">×</button>
+                                    </span>
+                                )}
                             </div>
                         )}
                     </CardContent>
@@ -513,7 +547,7 @@ const AllZones = () => {
                                         <TableHead>Loksabha Name</TableHead>
                                         <TableHead>State</TableHead>
                                         <TableHead>Range (km)</TableHead>
-                                        <TableHead>Survey limit</TableHead>
+                                        <TableHead>Survey Limit</TableHead>
                                         <TableHead>Surveys Filled</TableHead>
                                         <TableHead className="text-center">Actions</TableHead>
                                     </TableRow>
@@ -528,12 +562,11 @@ const AllZones = () => {
                                             </TableCell>
                                         </TableRow>
                                     ) : (
-                                        // MAP OVER CURRENT ROWS (Paginated) INSTEAD OF ALL FILTERED ZONES
                                         currentRows.map((zone) => {
                                             const surveyFilled = zone.surveyfilled || 0;
-                                            const surveysurvey_limit = zone.survey_limit || 0;
-                                            const isAtsurvey_limit = surveysurvey_limit > 0 && surveyFilled >= surveysurvey_limit;
-                                            const progressPercent = surveysurvey_limit > 0 ? Math.min((surveyFilled / surveysurvey_limit) * 100, 100) : 0;
+                                            const surveyLimit = zone.survey_limit || 0;
+                                            const isAtLimit = surveyLimit > 0 && surveyFilled >= surveyLimit;
+                                            const progressPercent = surveyLimit > 0 ? Math.min((surveyFilled / surveyLimit) * 100, 100) : 0;
 
                                             return (
                                                 <TableRow key={zone.zone_id}>
@@ -552,17 +585,17 @@ const AllZones = () => {
                                                     <TableCell>{zone.survey_limit || 'N/A'}</TableCell>
                                                     <TableCell>
                                                         <div className="flex items-center gap-2">
-                                                            <span className={`font-medium ${isAtsurvey_limit ? 'text-red-600' : 'text-gray-700'}`}>
+                                                            <span className={`font-medium ${isAtLimit ? 'text-red-600' : 'text-gray-700'}`}>
                                                                 {surveyFilled}
                                                             </span>
-                                                            {surveysurvey_limit > 0 && (
+                                                            {surveyLimit > 0 && (
                                                                 <>
                                                                     <span className="text-gray-400">/</span>
-                                                                    <span className="text-gray-600">{surveysurvey_limit}</span>
+                                                                    <span className="text-gray-600">{surveyLimit}</span>
                                                                     <Badge 
                                                                         variant="secondary" 
                                                                         className={`text-xs ${
-                                                                            isAtsurvey_limit 
+                                                                            isAtLimit 
                                                                                 ? 'bg-red-100 text-red-700' 
                                                                                 : progressPercent >= 75 
                                                                                 ? 'bg-yellow-100 text-yellow-700'
@@ -653,7 +686,6 @@ const AllZones = () => {
                                         />
                                     </PaginationItem>
                                     
-                                    {/* Simple logic to show current page */}
                                     <PaginationItem>
                                         <PaginationLink isActive>{currentPage}</PaginationLink>
                                     </PaginationItem>
@@ -677,7 +709,6 @@ const AllZones = () => {
                 </Card>
             </div>
 
-            {/* View/Edit/Delete Modals remain unchanged... */}
             {/* View Modal */}
             <Dialog open={!!modalData.view} onOpenChange={() => closeModal('view')}>
                 <DialogContent className="sm:max-w-md">
@@ -705,11 +736,17 @@ const AllZones = () => {
                                 <span className="font-semibold text-gray-700">Range:</span>
                                 <span className="text-gray-900">{modalData.view.range ? `${modalData.view.range} km` : 'N/A'}</span>
                                 
-                                <span className="font-semibold text-gray-700">Survey survey_limit:</span>
+                                <span className="font-semibold text-gray-700">Survey Limit:</span>
                                 <span className="text-gray-900">{modalData.view.survey_limit || 'N/A'}</span>
                                 
                                 <span className="font-semibold text-gray-700">Surveys Filled:</span>
                                 <span className="text-gray-900">{modalData.view.surveyfilled || 0}</span>
+                                
+                                <span className="font-semibold text-gray-700">lat:</span>
+                                <span className="text-gray-900">{modalData.view.lat !== null && modalData.view.lat !== undefined ? modalData.view.lat : 'N/A'}</span>
+                                
+                                <span className="font-semibold text-gray-700">lon:</span>
+                                <span className="text-gray-900">{modalData.view.lon !== null && modalData.view.lon !== undefined ? modalData.view.lon : 'N/A'}</span>
                             </div>
 
                             {modalData.view.survey_limit > 0 && (
@@ -738,51 +775,148 @@ const AllZones = () => {
                 </DialogContent>
             </Dialog>
 
-            {/* Edit Modal */}
+            {/* Edit Modal - UPDATED with lat and lon */}
             <Dialog open={!!modalData.edit} onOpenChange={() => closeModal('edit')}>
-                 <DialogContent className="sm:max-w-md">
+                 <DialogContent className="sm:max-w-lg">
                     <DialogHeader>
                         <DialogTitle>Edit Booth (ID: {modalData.edit?.zone_id})</DialogTitle>
                         <DialogDescription>Update the details for this Zone.</DialogDescription>
                     </DialogHeader>
-                    <div className="py-4 space-y-4">
-                        <label className="block text-sm font-medium">
-                            Booth Name
+                    <div className="py-4 space-y-4 max-h-[60vh] overflow-y-auto">
+                        <div>
+                            <Label htmlFor="zone_name" className="text-sm font-medium">
+                                Booth Name <span className="text-red-500">*</span>
+                            </Label>
                             <Input 
+                                id="zone_name"
                                 className="mt-1" 
                                 value={editFormData.zone_name} 
                                 onChange={(e) => setEditFormData({...editFormData, zone_name: e.target.value})} 
                                 disabled={isSubmitting}
+                                placeholder="Enter booth name"
                             />
-                        </label>
+                        </div>
                         
-                        <label className="block text-sm font-medium">
-                            Range (in kilometers)
-                            <Input 
-                                className="mt-1" 
-                                type="number"
-                                step="any"
-                                min="0"
-                                value={editFormData.range} 
-                                onChange={(e) => setEditFormData({...editFormData, range: e.target.value})} 
-                                disabled={isSubmitting}
-                                placeholder="Enter range in km"
-                            />
-                        </label>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <Label htmlFor="range" className="text-sm font-medium">
+                                    Range (km)
+                                </Label>
+                                <Input 
+                                    id="range"
+                                    className="mt-1" 
+                                    type="number"
+                                    step="any"
+                                    min="0"
+                                    value={editFormData.range} 
+                                    onChange={(e) => setEditFormData({...editFormData, range: e.target.value})} 
+                                    disabled={isSubmitting}
+                                    placeholder="Enter range"
+                                />
+                                {modalData.edit?.range && (
+                                    <p className="text-xs text-blue-600 mt-1">Current: {modalData.edit.range} km</p>
+                                )}
+                            </div>
 
-                        <label className="block text-sm font-medium">
-                            Survey per Booth
-                            <Input 
-                                className="mt-1" 
-                                type="number"
-                                step="1"
-                                min="0"
-                                value={editFormData.survey_limit} 
-                                onChange={(e) => setEditFormData({...editFormData, survey_limit: e.target.value})} 
-                                disabled={isSubmitting}
-                                placeholder="Enter survey survey_limit"
-                            />
-                        </label>
+                            <div>
+                                <Label htmlFor="survey_limit" className="text-sm font-medium">
+                                    Survey Limit
+                                </Label>
+                                <Input 
+                                    id="survey_limit"
+                                    className="mt-1" 
+                                    type="number"
+                                    step="1"
+                                    min="0"
+                                    value={editFormData.survey_limit} 
+                                    onChange={(e) => setEditFormData({...editFormData, survey_limit: e.target.value})} 
+                                    disabled={isSubmitting}
+                                    placeholder="Enter limit"
+                                />
+                                {modalData.edit?.survey_limit && (
+                                    <p className="text-xs text-blue-600 mt-1">Current: {modalData.edit.survey_limit}</p>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="border-t pt-4 mt-4">
+                            <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+                                📍 Location Coordinates
+                            </h4>
+                            
+                            {/* Display Current Coordinates Prominently */}
+                            <div className="mb-4 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded">
+                                <p className="text-sm font-semibold text-gray-700 mb-1">Current Coordinates:</p>
+                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                        <span className="text-gray-600">lat: </span>
+                                        <span className="font-bold text-blue-700">
+                                            {modalData.edit?.lat !== null && modalData.edit?.lat !== undefined 
+                                                ? modalData.edit.lat 
+                                                : <span className="text-gray-400 italic">Not set</span>}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <span className="text-gray-600">lon: </span>
+                                        <span className="font-bold text-blue-700">
+                                            {modalData.edit?.lon !== null && modalData.edit?.lon !== undefined 
+                                                ? modalData.edit.lon 
+                                                : <span className="text-gray-400 italic">Not set</span>}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <Label htmlFor="lat" className="text-sm font-medium flex justify-between items-center">
+                                        <span>lat</span>
+                                        {modalData.edit?.lat !== null && modalData.edit?.lat !== undefined && (
+                                            <span className="text-xs text-blue-600 font-normal">
+                                                Current: {modalData.edit.lat}
+                                            </span>
+                                        )}
+                                    </Label>
+                                    <Input 
+                                        id="lat"
+                                        className="mt-1" 
+                                        type="number"
+                                        step="any"
+                                        min="-90"
+                                        max="90"
+                                        value={editFormData.lat} 
+                                        onChange={(e) => setEditFormData({...editFormData, lat: e.target.value})} 
+                                        disabled={isSubmitting}
+                                        placeholder="e.g., 28.7041"
+                                    />
+                                    <p className="text-xs text-gray-500 mt-1">Range: -90 to 90</p>
+                                </div>
+
+                                <div>
+                                    <Label htmlFor="lon" className="text-sm font-medium flex justify-between items-center">
+                                        <span>lon</span>
+                                        {modalData.edit?.lon !== null && modalData.edit?.lon !== undefined && (
+                                            <span className="text-xs text-blue-600 font-normal">
+                                                Current: {modalData.edit.lon}
+                                            </span>
+                                        )}
+                                    </Label>
+                                    <Input 
+                                        id="lon"
+                                        className="mt-1" 
+                                        type="number"
+                                        step="any"
+                                        min="-180"
+                                        max="180"
+                                        value={editFormData.lon} 
+                                        onChange={(e) => setEditFormData({...editFormData, lon: e.target.value})} 
+                                        disabled={isSubmitting}
+                                        placeholder="e.g., 77.1025"
+                                    />
+                                    <p className="text-xs text-gray-500 mt-1">Range: -180 to 180</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => closeModal('edit')} disabled={isSubmitting}>Cancel</Button>

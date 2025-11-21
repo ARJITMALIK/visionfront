@@ -340,7 +340,7 @@ const AllSurveyData = () => {
     const [activeFilters, setActiveFilters] = useState(filters);
     const [activeDateRange, setActiveDateRange] = useState({ from: null, to: null });
     const [activeSearchQuery, setActiveSearchQuery] = useState("");
-
+console.log(searchQuery)
     // State for table selections
     const [selectedRows, setSelectedRows] = useState([]);
 
@@ -487,7 +487,7 @@ Nothing else after the percentage. This is so I can directly extract and store i
         setError(null);
         setSelectedRows([]);
         try {
-            const response = await VisionBase.get(`/surveys?limit=${limit}&page=${page}&sorting_field=sur_id&sorting_type=DESC`);
+            const response = await VisionBase.get(`/surveys?limit=${limit}&page=${page}&ot_parent_name=${searchQuery}&sorting_field=sur_id&sorting_type=DESC`);
             const apiData = response.data.data.rows || [];
             const total = response.data.data.count || 0;
             
@@ -656,11 +656,12 @@ Nothing else after the percentage. This is so I can directly extract and store i
     
     // Search and Reset handlers
     const handleSearch = () => {
-        setActiveFilters(filters);
-        const toDateWithTime = dateTo ? new Date(dateTo.setHours(23, 59, 59, 999)) : null;
-        setActiveDateRange({ from: dateFrom, to: toDateWithTime });
-        setActiveSearchQuery(searchQuery);
-        setPage(0); // Reset to first page
+        fetchSurveys();
+        // setActiveFilters(filters);
+        // const toDateWithTime = dateTo ? new Date(dateTo.setHours(23, 59, 59, 999)) : null;
+        // setActiveDateRange({ from: dateFrom, to: toDateWithTime });
+        // setActiveSearchQuery(searchQuery);
+        // setPage(0); // Reset to first page
     };
 
     const handleResetFilters = () => {
