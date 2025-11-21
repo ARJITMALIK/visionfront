@@ -60,7 +60,7 @@ const ForgotPasswordPage = () => {
                   </div>
                   <div className="flex flex-col items-start">
                     <span className="font-bold text-lg text-gray-800 tracking-wide">VISION DATA</span>
-                    <span className="text-[10px] text-gray-500">Powered by Abhasthra Technology</span>
+                    <span className="text-[10px] text-gray-500">Powered by Abhasthra Automation pvt ltd</span>
                   </div>
                 </div>
               </div>

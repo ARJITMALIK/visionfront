@@ -311,50 +311,6 @@ const Badge = ({ children, variant = "default", className = "" }) => {
     );
 };
 
-const Pagination = ({ currentPage, totalPages, onPageChange }) => {
-    const getVisiblePages = () => {
-        const delta = 1, range = [], rangeWithDots = [];
-        let left = currentPage - delta, right = currentPage + delta;
-        
-        if (totalPages <= 5) {
-            for (let i = 1; i <= totalPages; i++) rangeWithDots.push(i);
-            return rangeWithDots;
-        }
-
-        for (let i = 1; i <= totalPages; i++) {
-            if (i === 1 || i === totalPages || (i >= left && i <= right)) {
-                range.push(i);
-            }
-        }
-
-        let l;
-        for (let i of range) {
-            if (l) {
-                if (i - l === 2) {
-                    rangeWithDots.push(l + 1);
-                } else if (i - l !== 1) {
-                    rangeWithDots.push('...');
-                }
-            }
-            rangeWithDots.push(i);
-            l = i;
-        }
-        return rangeWithDots;
-    };
-    if (totalPages <= 1) return null;
-    return (
-        <nav className="flex items-center justify-center space-x-2">
-            <button onClick={() => onPageChange(Math.max(1, currentPage - 1))} disabled={currentPage === 1} className="flex items-center px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"><ChevronLeft className="h-4 w-4 mr-1" />Previous</button>
-            <div className="flex space-x-1">
-                {getVisiblePages().map((page, index) => (
-                    <button key={index} onClick={() => typeof page === 'number' && onPageChange(page)} className={`px-4 py-2 text-sm font-medium rounded-xl transition-all ${currentPage === page ? 'bg-gradient-to-r from-violet-500 to-purple-500 text-white shadow-lg' : typeof page === 'number' ? 'text-gray-700 hover:bg-gray-100' : 'text-gray-400 cursor-default'}`} disabled={typeof page !== 'number'}>{page}</button>
-                ))}
-            </div>
-            <button onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))} disabled={currentPage === totalPages} className="flex items-center px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all">Next<ChevronRight className="h-4 w-4 ml-1" /></button>
-        </nav>
-    );
-};
-
 // ===================================================================================
 // TOAST NOTIFICATION
 // ===================================================================================
@@ -374,7 +330,7 @@ const AllSurveyData = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     
-    // State for form filters (REMOVED ZONE, added ZC first)
+    // State for form filters
     const [filters, setFilters] = useState({ zc: 'all', ot: 'all' });
     const [searchQuery, setSearchQuery] = useState(""); 
     const [dateFrom, setDateFrom] = useState(null);
@@ -395,9 +351,10 @@ const AllSurveyData = () => {
     const [isBulkDeleting, setIsBulkDeleting] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
 
-    // State for pagination
-    const [currentPage, setCurrentPage] = useState(1);
-    const [rowsPerPage, setRowsPerPage] = useState(10);
+    // State for pagination (SERVER-SIDE)
+    const [page, setPage] = useState(0);
+    const [limit, setLimit] = useState(10);
+    const [totalCount, setTotalCount] = useState(0);
     
     // State for derived filter options
     const [filterOptions, setFilterOptions] = useState({ zcs: [], ots: [] });
@@ -407,6 +364,11 @@ const AllSurveyData = () => {
     const [analysisLoading, setAnalysisLoading] = useState(false);
     const [analysisError, setAnalysisError] = useState(null);
 
+    // State for export loading
+    const [isExporting, setIsExporting] = useState(false);
+
+    const limitOptions = [5, 10, 20, 50, 100];
+
     // AI Analysis function
     const analyzeSurveyAuthenticity = async (surveyData) => {
         setAnalysisLoading(true);
@@ -415,10 +377,38 @@ const AllSurveyData = () => {
         try {
             const payload = {
                 context: surveyData.sur_data,
-                prompt: "The provided data is survey taken by our team member, to know data authenticity i want to know how much the data is correctly filled(correctness in percentage) , to know fake survey data there may be illogical answer choosed , example for question:who will you vote for and the answer choosed is BJP and then next question is which candidate you will choose and you choosed rahul gandhi but it is from congress means the data is incorrect and filled by team member on his own. Please analyze the survey responses for logical consistency and provide a detailed authenticity report with percentage score. only give percentage as single answer so that i can directly store it in a variable"
+                prompt: `You are an expert survey data auditor for Assam (especially BTAD/BTR areas). Your task is to detect fake or fabricated survey entries filled by field team members instead of real respondents.
+
+Common signs of fake/fabricated data:
+- Severe logical contradictions (e.g., strongly likes only BJP but chooses Rahul Gandhi or Congress candidate, votes for one party but picks candidate from opposite party with no explanation)
+- Random or impossible answer patterns that no real voter would give
+- Repeated identical answers where variation is expected
+- Answers that ignore well-known local political realities of Bodoland/Assam
+
+Common signs of genuine data (even if some answers look odd):
+- Voters in BTAD often "like" multiple parties (BJP, UPPL, BPF, AGP, even INC) at the same time
+- Repeatedly writing "Hagrama" across parties is very common because Hagrama Mohilary is the most dominant local figure
+- Switching between UPPL and BPF is normal
+- Low education + unemployed youth + benefiting from Orunodoi/PM Kisan is typical
+
+Here is the survey data in JSON/array format:
+
+${JSON.stringify(surveyData.sur_data)}
+
+Please analyze the survey responses for logical consistency, taking into account the special political and social context of Assam/BTR.
+
+Provide:
+1. A short authenticity report (2-5 sentences) explaining your reasoning.
+2. Flag any minor or major inconsistencies.
+3. Finally, give only a single percentage score (0% to 100%) representing how authentic the data is (100% = completely genuine, 0% = clearly fabricated by team member).
+
+Important: At the very end of your response, on its own line, write only the percentage number like this:
+95%
+
+Nothing else after the percentage. This is so I can directly extract and store it in a variable.`
             };
 
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=AIzaSyARzsNUoYuIcZzzsqCIpRxQZWVomCOkIYM`, {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=YOUR_API_KEY`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -497,8 +487,9 @@ const AllSurveyData = () => {
         setError(null);
         setSelectedRows([]);
         try {
-            const response = await VisionBase.get('/surveys');
-            const apiData = response.data.data.rows;
+            const response = await VisionBase.get(`/surveys?limit=${limit}&page=${page}&sorting_field=sur_id&sorting_type=DESC`);
+            const apiData = response.data.data.rows || [];
+            const total = response.data.data.count || 0;
             
             const transformedData = apiData.map(item => ({ 
                 id: item.sur_id.toString(), 
@@ -524,61 +515,61 @@ const AllSurveyData = () => {
                 full_location: item.location 
             }));
             
-            // Sort surveys by ID in ascending order
-            const sortedData = transformedData.sort((a, b) => parseInt(a.id) - parseInt(b.id));
-            setSurveyData(sortedData.reverse());
+            setSurveyData(transformedData);
+            setTotalCount(total);
         } catch (err) {
             setError(err.message || 'Failed to fetch survey data. Please check your API endpoint.');
             console.error('Error fetching surveys:', err);
             setSurveyData([]);
+            setTotalCount(0);
         } finally {
             setLoading(false);
         }
     };
 
-    useEffect(() => { fetchSurveys(); }, []);
+    useEffect(() => { 
+        fetchSurveys(); 
+    }, [page, limit]);
     
-    // Effect to derive BASE filter options from data
+    // Effect to derive BASE filter options from ALL data (fetch once without pagination for filters)
     useEffect(() => {
-        if (surveyData.length > 0) {
-            const zcs = [...new Set(surveyData.map(d => d.zcName).filter(Boolean))].sort();
-            const ots = [...new Set(surveyData.map(d => d.otName).filter(Boolean))].sort();
-            setFilterOptions({ zcs, ots });
-        }
-    }, [surveyData]);
+        const fetchAllForFilters = async () => {
+            try {
+                const response = await VisionBase.get('/surveys?limit=10000&page=0');
+                const allData = response.data.data.rows || [];
+                
+                const zcs = [...new Set(allData.map(d => d.ot_parent_name).filter(Boolean))].sort();
+                const ots = [...new Set(allData.map(d => d.ot_name).filter(Boolean))].sort();
+                setFilterOptions({ zcs, ots });
+            } catch (err) {
+                console.error('Error fetching filter options:', err);
+            }
+        };
+        
+        fetchAllForFilters();
+    }, []);
 
     // Derive Available OT options based on selected ZC
     const dynamicOtOptions = useMemo(() => {
         if (filters.zc === 'all') {
             return filterOptions.ots;
         }
-        // Only show OTs that belong to the selected ZC
-        const filteredOts = new Set(
-            surveyData
-                .filter(d => d.zcName === filters.zc)
-                .map(d => d.otName)
-                .filter(Boolean)
-        );
-        return [...filteredOts].sort();
-    }, [filters.zc, surveyData, filterOptions.ots]);
+        // For cascading, we'd need all data - keeping simple for now
+        return filterOptions.ots;
+    }, [filters.zc, filterOptions.ots]);
     
-    // Memoized filtered data (Updated: Removed Zone, Added ZC logic)
+    // Client-side filtering for display
     const filteredData = useMemo(() => {
         return surveyData.filter(item => {
             const { zc, ot } = activeFilters;
             
-            // 1. ZC Filter
             const zcMatch = zc === 'all' || item.zcName === zc;
-            
-            // 2. OT Filter
             const otMatch = ot === 'all' || item.otName === ot;
 
-            // 3. Date Range Filter
             const { from, to } = activeDateRange;
             const itemDate = item.originalDate;
             const dateMatch = (!from || itemDate >= from) && (!to || itemDate <= to);
             
-            // 4. Search Query Filter
             const searchLower = activeSearchQuery.toLowerCase();
             const searchMatch = !activeSearchQuery || 
                 (item.name && item.name.toLowerCase().includes(searchLower)) ||
@@ -590,14 +581,68 @@ const AllSurveyData = () => {
         });
     }, [surveyData, activeFilters, activeDateRange, activeSearchQuery]);
 
-    const totalPages = Math.ceil(filteredData.length / rowsPerPage);
-    const paginatedData = filteredData.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
-    
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [filteredData, rowsPerPage]);
+    // Pagination helpers
+    const totalPages = Math.ceil(totalCount / limit);
+    const startIndex = page * limit + 1;
+    const endIndex = Math.min((page + 1) * limit, totalCount);
 
-    const handleSelectAll = (checked) => setSelectedRows(checked ? paginatedData.map(row => row.id) : []);
+    const handlePrevPage = () => {
+        if (page > 0) {
+            setPage(page - 1);
+        }
+    };
+
+    const handleNextPage = () => {
+        if (page < totalPages - 1) {
+            setPage(page + 1);
+        }
+    };
+
+    const handlePageClick = (pageNum) => {
+        setPage(pageNum);
+    };
+
+    const handleLimitChange = (newLimit) => {
+        setLimit(newLimit);
+        setPage(0);
+    };
+
+    const getPageNumbers = () => {
+        const pages = [];
+        const maxVisiblePages = 5;
+        
+        if (totalPages <= maxVisiblePages) {
+            for (let i = 0; i < totalPages; i++) {
+                pages.push(i);
+            }
+        } else {
+            if (page < 3) {
+                for (let i = 0; i < 4; i++) {
+                    pages.push(i);
+                }
+                pages.push('...');
+                pages.push(totalPages - 1);
+            } else if (page >= totalPages - 3) {
+                pages.push(0);
+                pages.push('...');
+                for (let i = totalPages - 4; i < totalPages; i++) {
+                    pages.push(i);
+                }
+            } else {
+                pages.push(0);
+                pages.push('...');
+                pages.push(page - 1);
+                pages.push(page);
+                pages.push(page + 1);
+                pages.push('...');
+                pages.push(totalPages - 1);
+            }
+        }
+        
+        return pages;
+    };
+
+    const handleSelectAll = (checked) => setSelectedRows(checked ? filteredData.map(row => row.id) : []);
     const handleSelectRow = (id) => setSelectedRows(prev => prev.includes(id) ? prev.filter(rowId => rowId !== id) : [...prev, id]);
     
     // Special handler for ZC change to reset OT if it becomes invalid
@@ -614,7 +659,8 @@ const AllSurveyData = () => {
         setActiveFilters(filters);
         const toDateWithTime = dateTo ? new Date(dateTo.setHours(23, 59, 59, 999)) : null;
         setActiveDateRange({ from: dateFrom, to: toDateWithTime });
-        setActiveSearchQuery(searchQuery); 
+        setActiveSearchQuery(searchQuery);
+        setPage(0); // Reset to first page
     };
 
     const handleResetFilters = () => {
@@ -627,31 +673,26 @@ const AllSurveyData = () => {
         setActiveFilters(initialFilters);
         setActiveDateRange({ from: null, to: null });
         setActiveSearchQuery("");
+        setPage(0);
     };
-    
-    // State for export loading
-    const [isExporting, setIsExporting] = useState(false);
 
     // Enhanced Excel Export Function for Large Datasets
+   // Enhanced Excel Export Function with Server Fetch
     const handleExport = async (type) => {
         setIsExporting(true);
         
         try {
-            console.log('Starting export, type:', type, 'Selected rows:', selectedRows);
-            
-            // Check if XLSX is available
             if (typeof XLSX === 'undefined') {
                 console.error('XLSX library not found');
                 alert("Excel library not loaded. Please refresh the page and try again.");
                 setIsExporting(false);
                 return;
             }
-            
-            console.log('XLSX library found:', XLSX);
-            
-            // Determine which data to export
+
             let dataToExport = [];
+
             if (type === 'selected') {
+                // EXPORT SELECTED: Use currently loaded data
                 if (selectedRows.length === 0) {
                     alert("No rows selected for export.");
                     setIsExporting(false);
@@ -659,21 +700,86 @@ const AllSurveyData = () => {
                 }
                 dataToExport = surveyData.filter(item => selectedRows.includes(item.id));
             } else {
-                dataToExport = filteredData;
+                // EXPORT ALL: Fetch from API with limit 10000
+                try {
+                    // Optional: Add a toast or loading indicator text here
+                    console.log("Fetching full dataset from server...");
+                    
+                    const response = await VisionBase.get('/surveys?limit=10000&page=0');
+                    const rawData = response.data.data.rows || [];
+
+                    if (rawData.length === 0) {
+                        alert("No data found on server.");
+                        setIsExporting(false);
+                        return;
+                    }
+
+                    // 1. Transform Raw Data (Same logic as fetchSurveys)
+                    const allFetchedData = rawData.map(item => ({ 
+                        id: item.sur_id.toString(), 
+                        name: item.citizen_name, 
+                        mobile: item.citizen_mobile, 
+                        otName: item.ot_name || 'N/A',
+                        otMobile: item.ot_mobile,
+                        otProfile: item.ot_profile,
+                        zcName: item.ot_parent_name || 'N/A',
+                        zoneName: item.zone_name || 'N/A',
+                        zcMobile: item.ot_parent_mobile,
+                        zcProfile: item.ot_parent_profile,
+                        zone: item.location ? item.location.split(',')[0].trim() : 'Unknown', 
+                        date: new Date(item.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }), 
+                        originalDate: new Date(item.date), 
+                        duration: item.duration, 
+                        recording: item.recording, 
+                        citizen_image: item.citizen_image, 
+                        sur_data: item.sur_data, 
+                        ot_id: item.ot_id, 
+                        booth_id: item.booth_id, 
+                        election_id: item.election_id, 
+                        full_location: item.location 
+                    }));
+
+                    // 2. Apply Active Filters to this large dataset
+                    // This ensures the export matches your search criteria, not just a raw dump
+                    dataToExport = allFetchedData.filter(item => {
+                        const { zc, ot } = activeFilters;
+                        const zcMatch = zc === 'all' || item.zcName === zc;
+                        const otMatch = ot === 'all' || item.otName === ot;
+
+                        const { from, to } = activeDateRange;
+                        const itemDate = item.originalDate;
+                        const dateMatch = (!from || itemDate >= from) && (!to || itemDate <= to);
+                        
+                        const searchLower = activeSearchQuery.toLowerCase();
+                        const searchMatch = !activeSearchQuery || 
+                            (item.name && item.name.toLowerCase().includes(searchLower)) ||
+                            (item.mobile && item.mobile.includes(searchLower)) ||
+                            (item.id && item.id.includes(searchLower)) ||
+                            (item.otName && item.otName.toLowerCase().includes(searchLower));
+
+                        return zcMatch && otMatch && dateMatch && searchMatch;
+                    });
+
+                } catch (err) {
+                    console.error("Error fetching all data for export:", err);
+                    alert("Failed to fetch full dataset from server.");
+                    setIsExporting(false);
+                    return;
+                }
             }
             
             console.log('Data to export count:', dataToExport.length);
             
             if (dataToExport.length === 0) {
-                alert("No data to export.");
+                alert("No data matches the current filters.");
                 setIsExporting(false);
                 return;
             }
             
-            // Show warning for large exports
-            if (dataToExport.length > 1000) {
+            // Confirmation for large datasets
+            if (dataToExport.length > 2000) {
                 const proceed = window.confirm(
-                    `You are about to export ${dataToExport.length} records. This may take a few moments. Continue?`
+                    `Ready to export ${dataToExport.length} records. This might take a few seconds. Continue?`
                 );
                 if (!proceed) {
                     setIsExporting(false);
@@ -681,10 +787,10 @@ const AllSurveyData = () => {
                 }
             }
             
-            // Allow UI to update before heavy processing
+            // Give UI a moment to update before freezing for Excel generation
             await new Promise(resolve => setTimeout(resolve, 100));
             
-            // Collect all unique questions across all surveys (optimized)
+            // 3. Determine Dynamic Columns (Questions)
             const allQuestionsMap = new Map();
             let questionOrder = [];
             
@@ -701,9 +807,7 @@ const AllSurveyData = () => {
                 }
             }
             
-            console.log('Unique questions found:', questionOrder.length);
-            
-            // Process data in chunks for better performance
+            // 4. Build Excel Rows (Chunked processing)
             const CHUNK_SIZE = 500;
             const excelData = [];
             
@@ -711,7 +815,6 @@ const AllSurveyData = () => {
                 const chunk = dataToExport.slice(i, i + CHUNK_SIZE);
                 
                 chunk.forEach(item => {
-                    // Base information
                     const row = {
                         'Survey ID': item.id,
                         'Citizen Name': item.name,
@@ -726,7 +829,6 @@ const AllSurveyData = () => {
                         'Duration': item.duration
                     };
                     
-                    // Create answer map for quick lookup
                     const answerMap = new Map();
                     if (item.sur_data && Array.isArray(item.sur_data)) {
                         item.sur_data.forEach(qa => {
@@ -736,7 +838,6 @@ const AllSurveyData = () => {
                         });
                     }
                     
-                    // Add each question column with its answer
                     questionOrder.forEach(question => {
                         row[question] = answerMap.get(question) || 'N/A';
                     });
@@ -744,28 +845,21 @@ const AllSurveyData = () => {
                     excelData.push(row);
                 });
                 
-                // Allow UI to remain responsive during processing
+                // Small delay to keep UI responsive
                 if (i + CHUNK_SIZE < dataToExport.length) {
                     await new Promise(resolve => setTimeout(resolve, 0));
                 }
             }
             
-            console.log('Excel data formatted, rows:', excelData.length);
-            
-            // Create workbook and worksheet with optimizations
-            const worksheet = XLSX.utils.json_to_sheet(excelData, {
-                cellDates: false,
-                skipHeader: false,
-                dense: false
-            });
-            
+            // 5. Create Workbook and Write File
+            const worksheet = XLSX.utils.json_to_sheet(excelData);
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, 'Survey Data');
             
-            // Auto-size columns (optimized for large datasets)
+            // Auto-width calculation
             const maxWidth = 50;
             const minWidth = 10;
-            const sampleSize = Math.min(100, excelData.length); // Only sample first 100 rows for sizing
+            const sampleSize = Math.min(100, excelData.length);
             
             const colWidths = Object.keys(excelData[0] || {}).map(key => {
                 const headerLength = key.length;
@@ -778,24 +872,13 @@ const AllSurveyData = () => {
             });
             worksheet['!cols'] = colWidths;
             
-            // Generate filename with timestamp
             const timestamp = new Date().toISOString().slice(0, 10);
             const filename = `survey_data_${type}_${timestamp}.xlsx`;
             
-            console.log('Attempting to write file:', filename);
+            XLSX.writeFile(workbook, filename);
             
-            // Export file with compression for large files
-            const writeOptions = {
-                bookType: 'xlsx',
-                bookSST: false,
-                type: 'binary',
-                compression: true
-            };
+            alert(`Successfully exported ${dataToExport.length} record(s)!`);
             
-            XLSX.writeFile(workbook, filename, writeOptions);
-            
-            console.log('Export completed successfully');
-            alert(`Successfully exported ${dataToExport.length} record(s) to Excel with ${questionOrder.length} question columns!`);
         } catch (error) {
             console.error('Export error details:', error);
             alert(`Failed to export data: ${error.message}`);
@@ -835,6 +918,7 @@ const AllSurveyData = () => {
             setSelectedRows([]);
             setBulkDeleteModalData(null);
             toast.success(`Successfully deleted ${idsToDelete.length} survey(s).`);
+            fetchSurveys(); // Refresh to update count
         } catch (err) {
             console.error("Failed to delete surveys:", err);
             toast.error(err.response?.data?.message || "Failed to delete surveys. Please try again.");
@@ -855,6 +939,7 @@ const AllSurveyData = () => {
             setSelectedRows(prev => prev.filter(id => id !== deleteModalData.id));
             setDeleteModalData(null);
             toast.success(`Successfully deleted survey #${deleteModalData.id}.`);
+            fetchSurveys(); // Refresh to update count
         } catch (err) {
             console.error("Failed to delete survey:", err);
             toast.error(err.response?.data?.message || "Failed to delete survey. Please try again.");
@@ -863,21 +948,24 @@ const AllSurveyData = () => {
         }
     };
 
-    const handleRefresh = () => fetchSurveys();
+    const handleRefresh = () => {
+        setPage(0);
+        fetchSurveys();
+    };
     
-    // Stats calculation
+    // Stats calculation (using totalCount from server)
     const stats = useMemo(() => {
         const today = new Date().toDateString();
         const surveysToday = surveyData.filter(s => s.originalDate.toDateString() === today).length;
         const totalOts = new Set(surveyData.map(s => s.otName)).size;
         const totalZcs = new Set(surveyData.map(s => s.zcName)).size;
         return {
-            totalSurveys: surveyData.length,
+            totalSurveys: totalCount,
             surveysToday,
             totalOts,
             totalZcs,
         };
-    }, [surveyData]);
+    }, [surveyData, totalCount]);
     
     const navigate = useNavigate();
     
@@ -904,7 +992,7 @@ const AllSurveyData = () => {
 
                 <Card>
                     <CardHeader className="flex flex-wrap justify-between items-center gap-4">
-                        <CardTitle>All Survey Records ({filteredData.length} matches)</CardTitle>
+                        <CardTitle>All Survey Records ({totalCount} total)</CardTitle>
                         <div className="flex items-center space-x-2">
                            <Button onClick={() => handleExport('all')} variant="outline" size="md" disabled={loading || isExporting}>
                                {isExporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin"/> : <Download className="h-4 w-4 mr-2"/>}
@@ -929,6 +1017,79 @@ const AllSurveyData = () => {
                         </div>
                     </CardHeader>
                     <CardContent>
+                        {/* Pagination Controls at Top */}
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
+                            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                                {/* Items per page dropdown */}
+                                <div className="flex items-center gap-3">
+                                    <span className="text-sm font-semibold text-gray-700">Items per page:</span>
+                                    <div className="w-24">
+                                        <Select 
+                                            value={limit} 
+                                            onValueChange={(v) => handleLimitChange(Number(v))}
+                                        >
+                                            {limitOptions.map(option => (
+                                                <SelectItem key={option} value={option}>{option}</SelectItem>
+                                            ))}
+                                        </Select>
+                                    </div>
+                                </div>
+
+                                {/* Page info */}
+                                <div className="text-sm font-semibold text-gray-700">
+                                    Showing {totalCount > 0 ? startIndex : 0} - {endIndex} of {totalCount} surveys
+                                </div>
+
+                                {/* Page navigation */}
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={handlePrevPage}
+                                        disabled={page === 0}
+                                        className={`p-2 rounded-lg font-bold transition-all ${
+                                            page === 0
+                                                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                                : 'bg-gradient-to-r from-violet-600 to-purple-600 text-white hover:from-violet-700 hover:to-purple-700 shadow-md hover:shadow-lg'
+                                        }`}
+                                    >
+                                        <ChevronLeft className="w-5 h-5" />
+                                    </button>
+
+                                    <div className="flex items-center gap-1">
+                                        {getPageNumbers().map((pageNum, index) => (
+                                            <React.Fragment key={index}>
+                                                {pageNum === '...' ? (
+                                                    <span className="px-3 py-2 text-gray-500 font-semibold">...</span>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => handlePageClick(pageNum)}
+                                                        className={`px-4 py-2 rounded-lg font-bold transition-all ${
+                                                            page === pageNum
+                                                                ? 'bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-lg'
+                                                                : 'bg-gray-100 text-gray-700 hover:bg-violet-100 hover:text-violet-700'
+                                                        }`}
+                                                    >
+                                                        {pageNum + 1}
+                                                    </button>
+                                                )}
+                                            </React.Fragment>
+                                        ))}
+                                    </div>
+
+                                    <button
+                                        onClick={handleNextPage}
+                                        disabled={page >= totalPages - 1}
+                                        className={`p-2 rounded-lg font-bold transition-all ${
+                                            page >= totalPages - 1
+                                                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                                : 'bg-gradient-to-r from-violet-600 to-purple-600 text-white hover:from-violet-700 hover:to-purple-700 shadow-md hover:shadow-lg'
+                                        }`}
+                                    >
+                                        <ChevronRight className="w-5 h-5" />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
                         {/* Filter Card */}
                         <div className="bg-gray-50/70 border border-gray-200/50 rounded-xl mb-6 p-4">
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
@@ -952,7 +1113,7 @@ const AllSurveyData = () => {
                                   <DatePicker selected={dateTo} onSelect={setDateTo} placeholder="To Date"/>
                                 </div>
 
-                                {/* ZC and OT Filters (Reordered & Cascading) */}
+                                {/* ZC and OT Filters */}
                                 <Select value={filters.zc} onValueChange={(v) => handleFilterChange('zc', v)} placeholder="Select ZC">
                                     <SelectItem value="all">All ZCs</SelectItem>
                                     {filterOptions.zcs.map(z => <SelectItem key={z} value={z}>{z}</SelectItem>)}
@@ -980,7 +1141,7 @@ const AllSurveyData = () => {
                                 <table className="w-full">
                                     <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
                                         <tr>
-                                            <th className="px-6 py-4 text-left w-[50px]"><Checkbox onCheckedChange={handleSelectAll} checked={paginatedData.length > 0 && selectedRows.length === paginatedData.length} /></th>
+                                            <th className="px-6 py-4 text-left w-[50px]"><Checkbox onCheckedChange={handleSelectAll} checked={filteredData.length > 0 && selectedRows.length === filteredData.length} /></th>
                                             <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">ID</th>
                                             <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Citizen Name</th>
                                             <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">OT Name</th>
@@ -991,7 +1152,7 @@ const AllSurveyData = () => {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100">
-                                        {paginatedData.length > 0 ? paginatedData.map((row) => (
+                                        {filteredData.length > 0 ? filteredData.map((row) => (
                                             <tr key={row.id} className={`hover:bg-violet-50/50 transition-colors ${selectedRows.includes(row.id) ? 'bg-violet-100' : ''}`}>
                                                 <td className="px-6 py-4"><Checkbox onCheckedChange={() => handleSelectRow(row.id)} checked={selectedRows.includes(row.id)}/></td>
                                                 <td className="px-6 py-4 text-sm font-semibold text-gray-900">#{row.id}</td>
@@ -1008,36 +1169,14 @@ const AllSurveyData = () => {
                                     </tbody>
                                 </table>
                             </div>
-                            {/* Pagination */}
-                            <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex flex-wrap gap-4 justify-between items-center relative z-10">
-                                <div className="flex items-center space-x-2">
-                                  <p className="text-sm text-gray-600">Rows per page:</p>
-                                  <div className="w-20">
-                                    {/* Set direction="up" to fix the hiding behind border issue */}
-                                    <Select 
-                                        value={rowsPerPage} 
-                                        onValueChange={(v) => setRowsPerPage(Number(v))}
-                                        direction="up" 
-                                    >
-                                        <SelectItem value={5}>5</SelectItem>
-                                        <SelectItem value={10}>10</SelectItem>
-                                        <SelectItem value={20}>20</SelectItem>
-                                        <SelectItem value={50}>50</SelectItem>
-                                    </Select>
-                                  </div>
-                                </div>
-                                <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
-                                <p className="text-sm text-gray-600 hidden md:block">
-                                    Page {currentPage} of {totalPages}
-                                </p>
-                            </div>
                         </div>
                         )}
                     </CardContent>
                 </Card>
             </div>
 
-            {/* Enhanced View Details Dialog with AI Analysis */}
+            {/* All Modals remain the same... */}
+            {/* View Details Dialog */}
             <Dialog isOpen={!!viewModalData} onClose={() => setViewModalData(null)}>
                 <DialogContent size="3xl">
                     <DialogHeader onClose={() => setViewModalData(null)}>

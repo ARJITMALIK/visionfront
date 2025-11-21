@@ -171,7 +171,7 @@ const Sidebar = ({ isOpen, setOpen, isCollapsed, setCollapsed }) => {
                   />
                   <div className="flex flex-col">
                     <h1 className="text-lg font-bold text-gray-900">Vision Data</h1>
-                    <p className="text-xs text-gray-500">Analytics Dashboard</p>
+                    <p className="text-xs text-gray-500">Powered by Abhastra automation</p>
                   </div>
                 </div>
               ) : (
