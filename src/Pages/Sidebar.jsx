@@ -19,7 +19,8 @@ const navItems = [
     label: 'Users',
     icon: Users,
     basePath: '/users',
-    subItems: [{ label: 'All Users', href: '/allusers' }]
+    subItems: [{ label: 'All Users', href: '/allusers' },{ label: 'Assign Booths', href: '/assignbooth' }]
+    
   },
   {
     label: 'Emoji',
