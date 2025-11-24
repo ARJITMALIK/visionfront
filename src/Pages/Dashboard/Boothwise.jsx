@@ -25,7 +25,7 @@ const Boothwise = () => {
     '#f97316', '#6366f1'
   ];
 
-  const limitOptions = [100, 200, 500, 1000, 2000];
+  const limitOptions = [100, 200, 500, 1000, 2000,4000,6000,8000,10000];
   
   useEffect(() => {
     fetchSurveys();
