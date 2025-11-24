@@ -34,6 +34,7 @@ import AddLoksabha from './Pages/Loksabha/AddLoksabha';
 import AllLoksabha from './Pages/Loksabha/AllLoksabha';
 import TeamTracking from './Pages/Live/TeamTracking';
 import LiveMap from './Pages/Live/LiveMap';
+import BoothAssign from './Pages/Users/BoothAssign';
 
 
 const App = () => {
@@ -56,6 +57,7 @@ const App = () => {
                 <Route path="/teamtrack" element={<TeamTracking />} />
                 <Route path="/livemap" element={<LiveMap/>} />
                 <Route path="/allusers" element={<AllUsers />} />
+                <Route path="/assignbooth" element={<BoothAssign />} />
                 <Route path="/addemoji" element={<AddEmoji />} />
                 <Route path="/allemoji" element={<AllEmoji />} />
                 <Route path="/addelection" element={<AddElection />} />
