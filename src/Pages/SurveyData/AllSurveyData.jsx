@@ -330,7 +330,7 @@ const AllSurveyData = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     
-    // State for form filters
+    // State for form filters (now using IDs)
     const [filters, setFilters] = useState({ zc: 'all', ot: 'all' });
     const [searchQuery, setSearchQuery] = useState(""); 
     const [dateFrom, setDateFrom] = useState(null);
@@ -340,7 +340,7 @@ const AllSurveyData = () => {
     const [activeFilters, setActiveFilters] = useState(filters);
     const [activeDateRange, setActiveDateRange] = useState({ from: null, to: null });
     const [activeSearchQuery, setActiveSearchQuery] = useState("");
-console.log(searchQuery)
+
     // State for table selections
     const [selectedRows, setSelectedRows] = useState([]);
 
@@ -356,8 +356,10 @@ console.log(searchQuery)
     const [limit, setLimit] = useState(10);
     const [totalCount, setTotalCount] = useState(0);
     
-    // State for derived filter options
-    const [filterOptions, setFilterOptions] = useState({ zcs: [], ots: [] });
+    // State for users (ZCs and OTs)
+    const [allUsers, setAllUsers] = useState([]);
+    const [zcUsers, setZcUsers] = useState([]);
+    const [otUsers, setOtUsers] = useState([]);
 
     // State for AI analysis
     const [analysisData, setAnalysisData] = useState(null);
@@ -368,6 +370,38 @@ console.log(searchQuery)
     const [isExporting, setIsExporting] = useState(false);
 
     const limitOptions = [5, 10, 20, 50, 100];
+
+    // Helper function to format date to yyyy-mm-dd
+    const formatDateForAPI = (date) => {
+        if (!date) return null;
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    // Fetch users (ZCs and OTs) on mount
+    useEffect(() => {
+        const fetchUsers = async () => {
+            try {
+                const response = await VisionBase.get('/users');
+                const users = response.data.data.rows || [];
+                
+                setAllUsers(users);
+                
+                // Filter ZCs (role = 2) and OTs (role = 3)
+                const zcs = users.filter(user => user.role === 2);
+                const ots = users.filter(user => user.role === 3);
+                
+                setZcUsers(zcs);
+                setOtUsers(ots);
+            } catch (err) {
+                console.error('Error fetching users:', err);
+            }
+        };
+        
+        fetchUsers();
+    }, []);
 
     // AI Analysis function
     const analyzeSurveyAuthenticity = async (surveyData) => {
@@ -486,8 +520,36 @@ Nothing else after the percentage. This is so I can directly extract and store i
         setLoading(true);
         setError(null);
         setSelectedRows([]);
+        
         try {
-            const response = await VisionBase.get(`/surveys?limit=${limit}&page=${page}&ot_parent_name=${searchQuery}&sorting_field=sur_id&sorting_type=DESC`);
+            // Build query parameters
+            let queryParams = `limit=${limit}&page=${page}&sorting_field=sur_id&sorting_type=DESC`;
+            
+            // Add ZC filter if selected
+            if (activeFilters.zc !== 'all') {
+                queryParams += `&zc_id=${activeFilters.zc}`;
+            }
+            
+            // Add OT filter if selected
+            if (activeFilters.ot !== 'all') {
+                queryParams += `&ot_id=${activeFilters.ot}`;
+            }
+            
+            // Add date filters if selected
+            if (activeDateRange.from) {
+                queryParams += `&start_date=${formatDateForAPI(activeDateRange.from)}`;
+            }
+            
+            if (activeDateRange.to) {
+                queryParams += `&end_date=${formatDateForAPI(activeDateRange.to)}`;
+            }
+            
+            // Add search query if present
+            if (activeSearchQuery) {
+                queryParams += `&search=${activeSearchQuery}`;
+            }
+            
+            const response = await VisionBase.get(`/surveys?${queryParams}`);
             const apiData = response.data.data.rows || [];
             const total = response.data.data.count || 0;
             
@@ -529,47 +591,20 @@ Nothing else after the percentage. This is so I can directly extract and store i
 
     useEffect(() => { 
         fetchSurveys(); 
-    }, [page, limit]);
-    
-    // Effect to derive BASE filter options from ALL data (fetch once without pagination for filters)
-    useEffect(() => {
-        const fetchAllForFilters = async () => {
-            try {
-                const response = await VisionBase.get('/surveys?limit=10000&page=0');
-                const allData = response.data.data.rows || [];
-                
-                const zcs = [...new Set(allData.map(d => d.ot_parent_name).filter(Boolean))].sort();
-                const ots = [...new Set(allData.map(d => d.ot_name).filter(Boolean))].sort();
-                setFilterOptions({ zcs, ots });
-            } catch (err) {
-                console.error('Error fetching filter options:', err);
-            }
-        };
-        
-        fetchAllForFilters();
-    }, []);
+    }, [page, limit, activeFilters, activeDateRange, activeSearchQuery]);
 
     // Derive Available OT options based on selected ZC
     const dynamicOtOptions = useMemo(() => {
         if (filters.zc === 'all') {
-            return filterOptions.ots;
+            return otUsers;
         }
-        // For cascading, we'd need all data - keeping simple for now
-        return filterOptions.ots;
-    }, [filters.zc, filterOptions.ots]);
-    
-    // Client-side filtering for display
+        // Filter OTs by their parent (ZC)
+        return otUsers.filter(ot => ot.parent === parseInt(filters.zc));
+    }, [filters.zc, otUsers]);
+
+    // Client-side filtering for display (now mostly handled by API, but kept for flexibility)
     const filteredData = useMemo(() => {
         return surveyData.filter(item => {
-            const { zc, ot } = activeFilters;
-            
-            const zcMatch = zc === 'all' || item.zcName === zc;
-            const otMatch = ot === 'all' || item.otName === ot;
-
-            const { from, to } = activeDateRange;
-            const itemDate = item.originalDate;
-            const dateMatch = (!from || itemDate >= from) && (!to || itemDate <= to);
-            
             const searchLower = activeSearchQuery.toLowerCase();
             const searchMatch = !activeSearchQuery || 
                 (item.name && item.name.toLowerCase().includes(searchLower)) ||
@@ -577,9 +612,9 @@ Nothing else after the percentage. This is so I can directly extract and store i
                 (item.id && item.id.includes(searchLower)) ||
                 (item.otName && item.otName.toLowerCase().includes(searchLower));
 
-            return zcMatch && otMatch && dateMatch && searchMatch;
+            return searchMatch;
         });
-    }, [surveyData, activeFilters, activeDateRange, activeSearchQuery]);
+    }, [surveyData, activeSearchQuery]);
 
     // Pagination helpers
     const totalPages = Math.ceil(totalCount / limit);
@@ -656,12 +691,11 @@ Nothing else after the percentage. This is so I can directly extract and store i
     
     // Search and Reset handlers
     const handleSearch = () => {
-        fetchSurveys();
-        // setActiveFilters(filters);
-        // const toDateWithTime = dateTo ? new Date(dateTo.setHours(23, 59, 59, 999)) : null;
-        // setActiveDateRange({ from: dateFrom, to: toDateWithTime });
-        // setActiveSearchQuery(searchQuery);
-        // setPage(0); // Reset to first page
+        setActiveFilters(filters);
+        const toDateWithTime = dateTo ? new Date(dateTo.setHours(23, 59, 59, 999)) : null;
+        setActiveDateRange({ from: dateFrom, to: toDateWithTime });
+        setActiveSearchQuery(searchQuery);
+        setPage(0); // Reset to first page
     };
 
     const handleResetFilters = () => {
@@ -677,8 +711,7 @@ Nothing else after the percentage. This is so I can directly extract and store i
         setPage(0);
     };
 
-    // Enhanced Excel Export Function for Large Datasets
-   // Enhanced Excel Export Function with Server Fetch
+    // Enhanced Excel Export Function with Server Fetch
     const handleExport = async (type) => {
         setIsExporting(true);
         
@@ -701,12 +734,34 @@ Nothing else after the percentage. This is so I can directly extract and store i
                 }
                 dataToExport = surveyData.filter(item => selectedRows.includes(item.id));
             } else {
-                // EXPORT ALL: Fetch from API with limit 10000
+                // EXPORT ALL: Fetch from API with current filters
                 try {
-                    // Optional: Add a toast or loading indicator text here
                     console.log("Fetching full dataset from server...");
                     
-                    const response = await VisionBase.get('/surveys?limit=10000&page=0');
+                    // Build query parameters with filters
+                    let queryParams = `limit=10000&page=0&sorting_field=sur_id&sorting_type=DESC`;
+                    
+                    if (activeFilters.zc !== 'all') {
+                        queryParams += `&zc_id=${activeFilters.zc}`;
+                    }
+                    
+                    if (activeFilters.ot !== 'all') {
+                        queryParams += `&ot_id=${activeFilters.ot}`;
+                    }
+                    
+                    if (activeDateRange.from) {
+                        queryParams += `&start_date=${formatDateForAPI(activeDateRange.from)}`;
+                    }
+                    
+                    if (activeDateRange.to) {
+                        queryParams += `&end_date=${formatDateForAPI(activeDateRange.to)}`;
+                    }
+                    
+                    if (activeSearchQuery) {
+                        queryParams += `&ot_parent_name=${activeSearchQuery}`;
+                    }
+                    
+                    const response = await VisionBase.get(`/surveys?${queryParams}`);
                     const rawData = response.data.data.rows || [];
 
                     if (rawData.length === 0) {
@@ -715,8 +770,8 @@ Nothing else after the percentage. This is so I can directly extract and store i
                         return;
                     }
 
-                    // 1. Transform Raw Data (Same logic as fetchSurveys)
-                    const allFetchedData = rawData.map(item => ({ 
+                    // Transform Raw Data
+                    dataToExport = rawData.map(item => ({ 
                         id: item.sur_id.toString(), 
                         name: item.citizen_name, 
                         mobile: item.citizen_mobile, 
@@ -739,27 +794,6 @@ Nothing else after the percentage. This is so I can directly extract and store i
                         election_id: item.election_id, 
                         full_location: item.location 
                     }));
-
-                    // 2. Apply Active Filters to this large dataset
-                    // This ensures the export matches your search criteria, not just a raw dump
-                    dataToExport = allFetchedData.filter(item => {
-                        const { zc, ot } = activeFilters;
-                        const zcMatch = zc === 'all' || item.zcName === zc;
-                        const otMatch = ot === 'all' || item.otName === ot;
-
-                        const { from, to } = activeDateRange;
-                        const itemDate = item.originalDate;
-                        const dateMatch = (!from || itemDate >= from) && (!to || itemDate <= to);
-                        
-                        const searchLower = activeSearchQuery.toLowerCase();
-                        const searchMatch = !activeSearchQuery || 
-                            (item.name && item.name.toLowerCase().includes(searchLower)) ||
-                            (item.mobile && item.mobile.includes(searchLower)) ||
-                            (item.id && item.id.includes(searchLower)) ||
-                            (item.otName && item.otName.toLowerCase().includes(searchLower));
-
-                        return zcMatch && otMatch && dateMatch && searchMatch;
-                    });
 
                 } catch (err) {
                     console.error("Error fetching all data for export:", err);
@@ -791,7 +825,7 @@ Nothing else after the percentage. This is so I can directly extract and store i
             // Give UI a moment to update before freezing for Excel generation
             await new Promise(resolve => setTimeout(resolve, 100));
             
-            // 3. Determine Dynamic Columns (Questions)
+            // Determine Dynamic Columns (Questions)
             const allQuestionsMap = new Map();
             let questionOrder = [];
             
@@ -808,7 +842,7 @@ Nothing else after the percentage. This is so I can directly extract and store i
                 }
             }
             
-            // 4. Build Excel Rows (Chunked processing)
+            // Build Excel Rows (Chunked processing)
             const CHUNK_SIZE = 500;
             const excelData = [];
             
@@ -852,7 +886,7 @@ Nothing else after the percentage. This is so I can directly extract and store i
                 }
             }
             
-            // 5. Create Workbook and Write File
+            // Create Workbook and Write File
             const worksheet = XLSX.utils.json_to_sheet(excelData);
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, 'Survey Data');
@@ -958,15 +992,15 @@ Nothing else after the percentage. This is so I can directly extract and store i
     const stats = useMemo(() => {
         const today = new Date().toDateString();
         const surveysToday = surveyData.filter(s => s.originalDate.toDateString() === today).length;
-        const totalOts = new Set(surveyData.map(s => s.otName)).size;
-        const totalZcs = new Set(surveyData.map(s => s.zcName)).size;
+        const totalOts = otUsers.length;
+        const totalZcs = zcUsers.length;
         return {
             totalSurveys: totalCount,
             surveysToday,
             totalOts,
             totalZcs,
         };
-    }, [surveyData, totalCount]);
+    }, [surveyData, totalCount, otUsers, zcUsers]);
     
     const navigate = useNavigate();
     
@@ -987,8 +1021,8 @@ Nothing else after the percentage. This is so I can directly extract and store i
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                     <Card><CardContent><div className="flex items-center"><div className="p-3 bg-violet-100 rounded-xl mr-4"><FileText className="h-6 w-6 text-violet-600"/></div><div><p className="text-sm text-gray-500">Total Surveys</p><p className="text-2xl font-bold text-gray-800">{loading ? '...' : stats.totalSurveys}</p></div></div></CardContent></Card>
                     <Card><CardContent><div className="flex items-center"><div className="p-3 bg-green-100 rounded-xl mr-4"><Calendar className="h-6 w-6 text-green-600"/></div><div><p className="text-sm text-gray-500">Surveys Today</p><p className="text-2xl font-bold text-gray-800">{loading ? '...' : stats.surveysToday}</p></div></div></CardContent></Card>
-                    <Card><CardContent><div className="flex items-center"><div className="p-3 bg-blue-100 rounded-xl mr-4"><Users className="h-6 w-6 text-blue-600"/></div><div><p className="text-sm text-gray-500">Active OTs</p><p className="text-2xl font-bold text-gray-800">{loading ? '...' : stats.totalOts}</p></div></div></CardContent></Card>
-                    <Card><CardContent><div className="flex items-center"><div className="p-3 bg-orange-100 rounded-xl mr-4"><Shield className="h-6 w-6 text-orange-600"/></div><div><p className="text-sm text-gray-500">Active ZCs</p><p className="text-2xl font-bold text-gray-800">{loading ? '...' : stats.totalZcs}</p></div></div></CardContent></Card>
+                    <Card><CardContent><div className="flex items-center"><div className="p-3 bg-blue-100 rounded-xl mr-4"><Users className="h-6 w-6 text-blue-600"/></div><div><p className="text-sm text-gray-500">Active OTs</p><p className="text-2xl font-bold text-gray-800">{stats.totalOts}</p></div></div></CardContent></Card>
+                    <Card><CardContent><div className="flex items-center"><div className="p-3 bg-orange-100 rounded-xl mr-4"><Shield className="h-6 w-6 text-orange-600"/></div><div><p className="text-sm text-gray-500">Active ZCs</p><p className="text-2xl font-bold text-gray-800">{stats.totalZcs}</p></div></div></CardContent></Card>
                 </div>
 
                 <Card>
@@ -1117,12 +1151,20 @@ Nothing else after the percentage. This is so I can directly extract and store i
                                 {/* ZC and OT Filters */}
                                 <Select value={filters.zc} onValueChange={(v) => handleFilterChange('zc', v)} placeholder="Select ZC">
                                     <SelectItem value="all">All ZCs</SelectItem>
-                                    {filterOptions.zcs.map(z => <SelectItem key={z} value={z}>{z}</SelectItem>)}
+                                    {zcUsers.map(zc => (
+                                        <SelectItem key={zc.user_id} value={zc.user_id.toString()}>
+                                            {zc.name}
+                                        </SelectItem>
+                                    ))}
                                 </Select>
                                 
                                 <Select value={filters.ot} onValueChange={(v) => handleFilterChange('ot', v)} placeholder="Select OT">
                                     <SelectItem value="all">All OTs</SelectItem>
-                                    {dynamicOtOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                                    {dynamicOtOptions.map(ot => (
+                                        <SelectItem key={ot.user_id} value={ot.user_id.toString()}>
+                                            {ot.name}
+                                        </SelectItem>
+                                    ))}
                                 </Select>
                                 
                                 {/* Action Buttons */}
@@ -1176,7 +1218,6 @@ Nothing else after the percentage. This is so I can directly extract and store i
                 </Card>
             </div>
 
-            {/* All Modals remain the same... */}
             {/* View Details Dialog */}
             <Dialog isOpen={!!viewModalData} onClose={() => setViewModalData(null)}>
                 <DialogContent size="3xl">
