@@ -32,11 +32,13 @@ import {
   CheckCircle,
   AlertTriangle,
   XCircle,
-  ChevronUp
+  ChevronUp,
+  FileDown
 } from 'lucide-react';
 import { VisionBase } from '@/utils/axiosInstance';
 import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
+import { generateSurveyPDF } from '@/utils/pdfGenerator'; 
 
 // ===================================================================================
 // MODERN UI COMPONENTS
@@ -325,6 +327,7 @@ const toast = {
 // ===================================================================================
 
 const AllSurveyData = () => {
+       const [isPdfExporting, setIsPdfExporting] = useState(false);
     // State for API data
     const [surveyData, setSurveyData] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -369,7 +372,7 @@ const AllSurveyData = () => {
     // State for export loading
     const [isExporting, setIsExporting] = useState(false);
 
-    const limitOptions = [5, 10, 20, 50, 100];
+    const limitOptions = [5, 10, 20, 50, 100,1000];
 
     // Helper function to format date to yyyy-mm-dd
     const formatDateForAPI = (date) => {
@@ -1003,6 +1006,31 @@ Nothing else after the percentage. This is so I can directly extract and store i
     }, [surveyData, totalCount, otUsers, zcUsers]);
     
     const navigate = useNavigate();
+
+
+     const handlePdfExport = async () => {
+        if (selectedRows.length === 0) {
+            alert("Please select at least one row to download the PDF.");
+            return;
+        }
+
+        setIsPdfExporting(true);
+
+        try {
+            // Get the full data objects for the selected IDs
+            const dataToExport = surveyData.filter(item => selectedRows.includes(item.id));
+            
+            // Call the utility function
+            await generateSurveyPDF(dataToExport);
+            
+            toast.success("PDF generated successfully!");
+        } catch (error) {
+            console.error("PDF Generation Error:", error);
+            alert("Failed to generate PDF. Check console for details.");
+        } finally {
+            setIsPdfExporting(false);
+        }
+    };
     
     return (
         <div className="min-h-screen font-sans">
@@ -1037,6 +1065,21 @@ Nothing else after the percentage. This is so I can directly extract and store i
                                {isExporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin"/> : <Download className="h-4 w-4 mr-2"/>}
                                {isExporting ? 'Exporting...' : 'Export Selected'}
                            </Button>
+
+                            <Button 
+                    onClick={handlePdfExport} 
+                    variant="outline" 
+                    size="md" 
+                    disabled={selectedRows.length === 0 || isPdfExporting || isExporting}
+                    className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 hover:border-red-300"
+                >
+                    {isPdfExporting ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin"/>
+                    ) : (
+                        <FileDown className="h-4 w-4 mr-2"/>
+                    )}
+                    {isPdfExporting ? 'Generating PDF...' : 'PDF Selected'}
+                </Button>
                            {selectedRows.length > 0 && (
                                <Button 
                                    onClick={handleBulkDeleteClick} 

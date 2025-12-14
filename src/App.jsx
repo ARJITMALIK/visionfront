@@ -35,6 +35,7 @@ import AllLoksabha from './Pages/Loksabha/AllLoksabha';
 import TeamTracking from './Pages/Live/TeamTracking';
 import LiveMap from './Pages/Live/LiveMap';
 import BoothAssign from './Pages/Users/BoothAssign';
+import Master_report from './Pages/Dashboard/Master_report';
 
 
 const App = () => {
@@ -79,6 +80,7 @@ const App = () => {
                 <Route path="/all-vidhan" element={<AllDistricts />} />
                 <Route path="/addloksabha" element={<AddLoksabha />} />
                 <Route path="/allloksabha" element={<AllLoksabha />} />
+                <Route path="/master-report" element={<Master_report/>} />
 
 
                 {/* IMPORTANT: Use the path that your Sidebar expects for active styling */}
