@@ -4,11 +4,13 @@ import {
   LayoutDashboard, ChevronDown, Users, Smile, Vote, Database, 
   FileText, Briefcase, MapPin, Blocks, User, Bell, Landmark, Building2,
   Home,
-  EarthIcon
+  EarthIcon,
+  NotepadTextIcon
 } from 'lucide-react';
 
 const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
+   { label: 'Master Report', icon: NotepadTextIcon, href: '/master-report' },
   {
     label: 'Live Tracking',
     icon: EarthIcon,
