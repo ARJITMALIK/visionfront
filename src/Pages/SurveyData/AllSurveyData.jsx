@@ -28,8 +28,9 @@ import {
   ChevronUp,
   FileDown,
   Shield,
-  EyeIcon,
-  Trash2Icon
+  User,
+  UserCheck,
+  PlayCircle
 } from 'lucide-react';
 import { VisionBase } from '@/utils/axiosInstance'; 
 import { useNavigate } from 'react-router-dom';
@@ -49,7 +50,6 @@ const getBase64ImageFromURL = (url) => {
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0);
       try {
-          // Compress to 0.6 quality to ensure 3350 records fit in one PDF
           const dataURL = canvas.toDataURL('image/jpeg', 0.6); 
           resolve(dataURL);
       } catch (e) { resolve(null); }
@@ -60,14 +60,16 @@ const getBase64ImageFromURL = (url) => {
 };
 
 // ===================================================================================
-// 2. HELPER: ZONE-WISE PDF GENERATOR (SPLIT INTO 3 PARTS)
+// 2. HELPER: ZONE-WISE PDF GENERATOR
 // ===================================================================================
 const generateZoneWisePDF = async (surveys, onProgress) => {
-  // --- CONFIGURATION ---
-  const RECORDS_PER_PDF = 3350; // Requested split size
+  const RECORDS_PER_PDF = 3335; 
+  const MARGIN_X = 10;
+  const COL_GAP = 5;
+  const CARD_WIDTH = 90; 
+  const CARD_HEIGHT = 40; 
+  const ROW_GAP = 4;
   
-  // 1. Sort & Flatten Data
-  // We sort by Zone first so the PDF is grouped correctly
   const grouped = surveys.reduce((acc, item) => {
     const zone = item.zoneName || "Unknown Zone";
     if (!acc[zone]) acc[zone] = [];
@@ -84,7 +86,6 @@ const generateZoneWisePDF = async (surveys, onProgress) => {
 
   const totalRecords = flatSortedList.length;
 
-  // 2. PDF Generation State
   let doc = new jsPDF();
   let pageWidth = doc.internal.pageSize.getWidth();
   let pageHeight = doc.internal.pageSize.getHeight();
@@ -92,136 +93,144 @@ const generateZoneWisePDF = async (surveys, onProgress) => {
   let currentBatchCount = 0;
   let partNumber = 1;
   let totalProcessed = 0;
-  let yPos = 45;
+  let yPos = 45; 
+  let currentCol = 0; 
   let currentZoneContext = ""; 
 
-  // Helper to setup a fresh page/file
   const initializeNewPDF = () => {
     if (totalProcessed > 0) {
-       doc = new jsPDF(); // Clear memory explicitly
+       doc = new jsPDF(); 
        currentBatchCount = 0;
        yPos = 45;
+       currentCol = 0;
     }
     
-    // Title
-    doc.setFontSize(18);
+    doc.setFontSize(20);
     doc.setTextColor(109, 40, 217); 
-    doc.text(`Zone-Wise Report (Part ${partNumber})`, 14, 20);
+    doc.text(`Survey Report: Zone Wise (Part ${partNumber})`, 14, 20);
     
     doc.setFontSize(10);
     doc.setTextColor(100);
-    doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 28);
+    doc.text(`Generated: ${new Date().toLocaleDateString()} | Total Records: ${totalRecords}`, 14, 28);
     doc.text(`Records in this file: ~${Math.min(RECORDS_PER_PDF, totalRecords - (partNumber-1)*RECORDS_PER_PDF)}`, 14, 33);
     
     doc.setDrawColor(200);
     doc.line(14, 38, pageWidth - 14, 38);
   };
 
-  // Init first file
   initializeNewPDF();
 
-  // 3. Loop Records
   for (let i = 0; i < flatSortedList.length; i++) {
     const item = flatSortedList[i];
     const thisZone = item._groupZone;
 
-    // --- BATCH SPLIT CHECK ---
     if (currentBatchCount >= RECORDS_PER_PDF) {
-      // Save current part
       doc.save(`Zone_Report_Part_${partNumber}_${new Date().toISOString().slice(0,10)}.pdf`);
-      
-      // Prepare next part
       partNumber++;
       initializeNewPDF();
-      
-      // If we split in the middle of a zone, reprint the header
       if (currentZoneContext === thisZone) {
          doc.setFontSize(10);
          doc.setTextColor(150);
-         doc.text(`(Continuation of Zone: ${thisZone})`, 14, 42);
+         doc.text(`(Continuation of Zone: ${thisZone})`, 14, 43);
+         yPos = 50;
       }
     }
 
-    // --- ZONE HEADER ---
-    // If zone changed OR we are at start of new file and need to show current zone
-    if (thisZone !== currentZoneContext || (currentBatchCount === 0 && thisZone === currentZoneContext)) {
-        
+    if (thisZone !== currentZoneContext) {
+        if (currentCol === 1) {
+            currentCol = 0;
+            yPos += CARD_HEIGHT + ROW_GAP; 
+        }
+
         if (yPos + 15 > pageHeight - 15) {
             doc.addPage();
             yPos = 20;
+            currentCol = 0;
         }
 
-        doc.setFillColor(240, 240, 245);
-        doc.rect(14, yPos, pageWidth - 28, 10, 'F');
-        doc.setFontSize(14);
+        doc.setFillColor(230, 230, 240); 
+        doc.rect(MARGIN_X, yPos, pageWidth - (MARGIN_X*2), 8, 'F');
+        
+        doc.setFontSize(12);
         doc.setTextColor(0);
         doc.setFont("helvetica", "bold");
+        doc.text(`ZONE: ${thisZone}`, MARGIN_X + 2, yPos + 5.5);
         
-        const label = (thisZone === currentZoneContext && currentBatchCount === 0) 
-            ? `${thisZone} (Continued)` 
-            : `${thisZone}`;
-            
-        doc.text(`ZONE: ${label}`, 16, yPos + 7);
-        yPos += 15;
+        yPos += 12; 
         currentZoneContext = thisZone;
     }
 
-    // --- UPDATE PROGRESS ---
+    if (yPos + CARD_HEIGHT > pageHeight - 10) {
+        doc.addPage();
+        yPos = 20;
+        currentCol = 0; 
+        doc.setFontSize(8);
+        doc.setTextColor(150);
+        doc.text(`(Cont. ${thisZone})`, MARGIN_X, yPos - 5);
+    }
+
+    const citizenImg = await getBase64ImageFromURL(item.citizen_image);
+    const xPos = currentCol === 0 ? MARGIN_X : MARGIN_X + CARD_WIDTH + COL_GAP;
+
+    doc.setDrawColor(200);
+    doc.setFillColor(255, 255, 255);
+    doc.roundedRect(xPos, yPos, CARD_WIDTH, CARD_HEIGHT, 2, 2, 'S');
+
+    const imgSize = 34;
+    const imgMargin = 3;
+    if (citizenImg) {
+      try {
+        doc.addImage(citizenImg, 'JPEG', xPos + imgMargin, yPos + imgMargin, imgSize, imgSize);
+      } catch (e) {}
+    } else {
+      doc.rect(xPos + imgMargin, yPos + imgMargin, imgSize, imgSize);
+      doc.setFontSize(7);
+      doc.text("No Img", xPos + 10, yPos + 15);
+    }
+
+    const textX = xPos + imgSize + 6;
+    const lineSpacing = 5.5;
+    let textY = yPos + 8;
+
+    doc.setTextColor(0);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.text(`SURVEY ID: ${item.sur_id || 'N/A'}`, textX, textY);
+    
+    textY += lineSpacing;
+    doc.setFontSize(9);
+    doc.text(item.name ? item.name.substring(0, 25) : "Unknown", textX, textY);
+    
+    textY += lineSpacing;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(50);
+    doc.text(`${item.mobile || ''} | ${item.date}`, textX, textY);
+    
+    textY += lineSpacing;
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(0);
+    doc.text(`Booth: ${item.booth_id || 'N/A'}`, textX, textY);
+    
+    textY += lineSpacing;
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(60);
+    doc.text(thisZone.substring(0, 25), textX, textY); 
+
     totalProcessed++;
     currentBatchCount++;
     if (onProgress) onProgress(totalProcessed, totalRecords);
-    
-    // Pause briefly to let UI update
-    if (totalProcessed % 20 === 0) {
-       await new Promise(resolve => setTimeout(resolve, 0));
-    }
 
-    // --- PAGE BREAK ---
-    if (yPos + 35 > pageHeight - 15) {
-      doc.addPage();
-      yPos = 20;
-      doc.setFontSize(9);
-      doc.setTextColor(150);
-      doc.text(`(Cont. ${thisZone})`, 14, yPos - 5);
-    }
+    if (totalProcessed % 20 === 0) await new Promise(r => setTimeout(r, 0));
 
-    // --- IMAGE & CONTENT ---
-    const citizenImg = await getBase64ImageFromURL(item.citizen_image);
-
-    // Card BG
-    doc.setDrawColor(220);
-    doc.setFillColor(255, 255, 255);
-    doc.roundedRect(14, yPos, pageWidth - 28, 30, 2, 2, 'S');
-
-    // Image
-    if (citizenImg) {
-      try {
-        doc.addImage(citizenImg, 'JPEG', 16, yPos + 2, 26, 26);
-      } catch (e) {}
+    if (currentCol === 0) {
+        currentCol = 1; 
     } else {
-      doc.rect(16, yPos + 2, 26, 26);
-      doc.setFontSize(7);
-      doc.text("No Img", 20, yPos + 15);
+        currentCol = 0; 
+        yPos += CARD_HEIGHT + ROW_GAP; 
     }
-
-    // Details
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    doc.setTextColor(0);
-    doc.text(item.name || "Unknown", 45, yPos + 8);
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(60);
-    doc.text(`Mobile: ${item.mobile || 'N/A'}`, 45, yPos + 14);
-    doc.text(`Date: ${item.date}`, 45, yPos + 19);
-    const loc = item.full_location ? item.full_location.substring(0, 70) : 'N/A';
-    doc.text(`Loc: ${loc}`, 45, yPos + 24);
-
-    yPos += 34;
   }
 
-  // Save the final part
   if (currentBatchCount > 0) {
       doc.save(`Zone_Report_Part_${partNumber}_${new Date().toISOString().slice(0,10)}.pdf`);
   }
@@ -338,11 +347,12 @@ const AllSurveyData = () => {
     const [bulkDeleteModalData, setBulkDeleteModalData] = useState(null);
     const [isDeleting, setIsDeleting] = useState(false);
 
-    // -- State: Exports & AI --
+    // -- State: Exports --
     const [isExporting, setIsExporting] = useState(false);
     const [isPdfGenerating, setIsPdfGenerating] = useState(false);
     const [pdfProgress, setPdfProgress] = useState({ current: 0, total: 0 });
     
+    // -- State: AI --
     const [analysisData, setAnalysisData] = useState(null);
     const [analysisLoading, setAnalysisLoading] = useState(false);
 
@@ -387,19 +397,25 @@ const AllSurveyData = () => {
             
             const transformed = rows.map(item => ({
                 id: item.sur_id.toString(),
+                sur_id: item.sur_id.toString(), 
+                booth_id: item.booth_id,        
                 name: item.citizen_name,
                 mobile: item.citizen_mobile,
+                // --- Updated Mapping for OT/ZC Details ---
                 otName: item.ot_name || 'N/A',
                 otMobile: item.ot_mobile,
                 otProfile: item.ot_profile,
+                otRole: item.ot_role,
                 zcName: item.ot_parent_name || 'N/A',
                 zoneName: item.zone_name || 'Unknown Zone',
                 zcMobile: item.ot_parent_mobile,
                 zcProfile: item.ot_parent_profile,
+                zcRole: item.ot_parent_role,
+                // ----------------------------------------
                 date: new Date(item.date).toLocaleDateString('en-GB'),
                 originalDate: new Date(item.date),
                 citizen_image: item.citizen_image,
-                recording: item.recording,
+                recording: item.recording, // Mapped here
                 full_location: item.location,
                 sur_data: item.sur_data
             }));
@@ -459,7 +475,6 @@ const AllSurveyData = () => {
         setPdfProgress({ current: 0, total: 0 });
 
         try {
-            // A. Build Query for ALL data (up to 10k)
             let q = `limit=10000&page=0&sorting_field=sur_id&sorting_type=DESC`;
             if (activeFilters.zc !== 'all') q += `&zc_id=${activeFilters.zc}`;
             if (activeFilters.ot !== 'all') q += `&ot_id=${activeFilters.ot}`;
@@ -467,7 +482,6 @@ const AllSurveyData = () => {
             if (activeDateRange.to) q += `&end_date=${formatDateForAPI(activeDateRange.to)}`;
             if (activeSearchQuery) q += `&search=${activeSearchQuery}`;
 
-            // B. Fetch
             const response = await VisionBase.get(`/surveys?${q}`);
             const rawData = response.data.data.rows || [];
 
@@ -477,9 +491,10 @@ const AllSurveyData = () => {
                 return;
             }
 
-            // C. Transform
             const fullData = rawData.map(item => ({
                 id: item.sur_id.toString(),
+                sur_id: item.sur_id.toString(), 
+                booth_id: item.booth_id, 
                 name: item.citizen_name,
                 mobile: item.citizen_mobile,
                 zoneName: item.zone_name || 'Unknown Zone',
@@ -488,12 +503,9 @@ const AllSurveyData = () => {
                 full_location: item.location
             }));
 
-            // D. Generate PDF with Progress
             await generateZoneWisePDF(fullData, (current, total) => {
                 setPdfProgress({ current, total });
             });
-
-            // toast.success("PDF Downloaded Successfully!"); 
 
         } catch (err) {
             console.error(err);
@@ -510,27 +522,71 @@ const AllSurveyData = () => {
             let q = `limit=10000&page=0&sorting_field=sur_id&sorting_type=DESC`;
             if (activeFilters.zc !== 'all') q += `&zc_id=${activeFilters.zc}`;
             if (activeFilters.ot !== 'all') q += `&ot_id=${activeFilters.ot}`;
+            if (activeDateRange.from) q += `&start_date=${formatDateForAPI(activeDateRange.from)}`;
+            if (activeDateRange.to) q += `&end_date=${formatDateForAPI(activeDateRange.to)}`;
+            if (activeSearchQuery) q += `&search=${activeSearchQuery}`;
             
             const res = await VisionBase.get(`/surveys?${q}`);
             const data = res.data.data.rows || [];
+
+            if (data.length === 0) {
+                alert("No records to export.");
+                setIsExporting(false);
+                return;
+            }
+
+            const allQuestionsMap = new Map();
+            const questionOrder = [];
             
-            const excelRows = data.map(item => ({
-                ID: item.sur_id,
-                Citizen: item.citizen_name,
-                Mobile: item.citizen_mobile,
-                Zone: item.zone_name,
-                OT: item.ot_name,
-                ZC: item.ot_parent_name,
-                Date: new Date(item.date).toLocaleDateString(),
-                Location: item.location
-            }));
+            data.forEach(item => {
+                if (item.sur_data && Array.isArray(item.sur_data)) {
+                    item.sur_data.forEach(qa => {
+                        if (qa.question && !allQuestionsMap.has(qa.question)) {
+                            allQuestionsMap.set(qa.question, true);
+                            questionOrder.push(qa.question);
+                        }
+                    });
+                }
+            });
+
+            const excelRows = data.map(item => {
+                const row = {
+                    'Survey ID': item.sur_id,
+                    'Citizen Name': item.citizen_name,
+                    'Mobile': item.citizen_mobile,
+                    'Zone': item.zone_name,
+                    'Booth': item.booth_id,
+                    'OT Name': item.ot_name,
+                    'ZC Name': item.ot_parent_name,
+                    'Date': new Date(item.date).toLocaleDateString(),
+                    'Location': item.location
+                };
+
+                const answerMap = new Map();
+                if (item.sur_data && Array.isArray(item.sur_data)) {
+                    item.sur_data.forEach(qa => {
+                        if (qa.question) answerMap.set(qa.question, qa.answer);
+                    });
+                }
+
+                questionOrder.forEach(q => {
+                    row[q] = answerMap.get(q) || 'N/A';
+                });
+
+                return row;
+            });
 
             const ws = XLSX.utils.json_to_sheet(excelRows);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Surveys");
-            XLSX.writeFile(wb, `Survey_Data_${Date.now()}.xlsx`);
-        } catch (e) { alert("Export failed"); }
-        finally { setIsExporting(false); }
+            XLSX.writeFile(wb, `Survey_Data_Full_${Date.now()}.xlsx`);
+
+        } catch (e) { 
+            console.error("Export Error:", e);
+            alert("Export failed. See console."); 
+        } finally { 
+            setIsExporting(false); 
+        }
     };
 
     // 7. Delete Logic
@@ -574,7 +630,7 @@ const AllSurveyData = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50/50 p-4 font-sans">
+        <div className="min-h-screen bg-gray-50/50  font-sans">
              {/* Background Decoration */}
             <div className="fixed -top-40 -right-40 w-96 h-96 bg-violet-200/30 rounded-full blur-3xl pointer-events-none"/>
             <div className="fixed -bottom-40 -left-40 w-96 h-96 bg-pink-200/30 rounded-full blur-3xl pointer-events-none"/>
@@ -607,7 +663,7 @@ const AllSurveyData = () => {
                             {/* Excel Export Button */}
                             <Button variant="outline" onClick={handleExcelExport} disabled={isExporting}>
                                 {isExporting ? <Loader2 className="w-4 h-4 mr-2 animate-spin"/> : <Download className="w-4 h-4 mr-2"/>}
-                                Export Excel
+                                Export Excel (Full)
                             </Button>
 
                             {/* Bulk Delete Button */}
@@ -699,8 +755,8 @@ const AllSurveyData = () => {
                                             <td className="px-6 py-4 text-sm text-gray-600">{row.otName}</td>
                                             <td className="px-6 py-4 text-sm text-gray-500">{row.date}</td>
                                             <td className="px-6 py-4 flex gap-2">
-                                                <EyeIcon className="h-8 w-8 p-2 cursor-pointer" onClick={() => { setViewModalData(row); setAnalysisData(null); }}/>
-                                                <Trash2Icon className="h-8 w-8 p-2 cursor-pointer" onClick={() => setDeleteModalData(row)}/>
+                                              <Eye className="p-2 h-8 w-8 cursor-pointer" onClick={() => { setViewModalData(row); setAnalysisData(null); }}/>
+                                                <Trash2 className="p-2 h-8 w-8 cursor-pointer" onClick={() => setDeleteModalData(row)}/>
                                             </td>
                                         </tr>
                                     ))}
@@ -740,7 +796,7 @@ const AllSurveyData = () => {
                              <FileDown className="w-16 h-16 text-violet-500 mx-auto animate-bounce"/>
                         </div>
                         <h3 className="text-xl font-bold text-gray-900 mb-2">Generating PDF (3 Parts)</h3>
-                        <p className="text-sm text-gray-500 mb-6">Grouping by Zone...</p>
+                        <p className="text-sm text-gray-500 mb-6">Parsing Zone-wise Grid...</p>
                         
                         <div className="w-full bg-gray-100 rounded-full h-3 mb-2 overflow-hidden border border-gray-200">
                             <div 
@@ -759,61 +815,132 @@ const AllSurveyData = () => {
             {/* --- MODAL: VIEW DETAILS --- */}
             <Dialog isOpen={!!viewModalData} onClose={() => setViewModalData(null)}>
                 <DialogContent size="xl">
-                    <div className="p-6 border-b flex justify-between items-center">
-                        <h3 className="text-lg font-bold">Survey Details</h3>
-                        <button onClick={()=>setViewModalData(null)} className="p-2 hover:bg-gray-100 rounded-full"><X className="w-5 h-5"/></button>
+                    <div className="p-6 border-b flex justify-between items-center bg-gradient-to-r from-violet-50 to-white">
+                        <h3 className="text-xl font-bold text-gray-800">Survey Details <span className="text-violet-500">#{viewModalData?.sur_id}</span></h3>
+                        <button onClick={()=>setViewModalData(null)} className="p-2 hover:bg-gray-100 rounded-full transition"><X className="w-5 h-5 text-gray-500"/></button>
                     </div>
-                    <div className="p-6 overflow-y-auto max-h-[70vh]">
+                    <div className="p-6 overflow-y-auto max-h-[80vh]">
                         {viewModalData && (
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                {/* Left: Images */}
+                                {/* Left Column: Citizen Image, Audio & AI */}
                                 <div>
-                                    <div className="bg-gray-50 p-2 rounded-xl border border-gray-200">
-                                        <img src={viewModalData.citizen_image} alt="Citizen" className="w-full rounded-lg shadow-sm mb-4"/>
-                                        <div className="flex items-center justify-between text-sm text-gray-600 px-2">
-                                            <span className="flex items-center"><Camera className="w-4 h-4 mr-1"/> Citizen</span>
+                                    {/* 1. Image Card */}
+                                    <div className="bg-white p-2 rounded-2xl border border-gray-100 shadow-sm">
+                                        <div className="relative aspect-square bg-gray-100 rounded-xl overflow-hidden mb-3">
+                                            {viewModalData.citizen_image ? (
+                                                <img src={viewModalData.citizen_image} alt="Citizen" className="w-full h-full object-cover"/>
+                                            ) : (
+                                                <div className="w-full h-full flex flex-col items-center justify-center text-gray-400">
+                                                    <Camera className="w-12 h-12 mb-2 opacity-50"/>
+                                                    <span className="text-xs">No Image</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="text-center">
+                                            <p className="font-bold text-gray-900">{viewModalData.name}</p>
+                                            <p className="text-sm text-gray-500">{viewModalData.mobile}</p>
                                         </div>
                                     </div>
                                     
+                                    {/* 2. Audio Player Card (NEW) */}
+                                    {viewModalData.recording && (
+                                        <div className="mt-4 bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
+                                            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                                <Voicemail className="w-4 h-4 text-violet-500"/> Audio Recording
+                                            </h4>
+                                            <audio controls className="w-full h-8 block rounded-md bg-gray-50">
+                                                <source src={viewModalData.recording} type="audio/mp4" />
+                                                <source src={viewModalData.recording} type="audio/mpeg" />
+                                                <source src={viewModalData.recording} type="audio/m4a" />
+                                                Your browser does not support the audio element.
+                                            </audio>
+                                        </div>
+                                    )}
+
+                                    {/* 3. AI Analysis Card */}
                                     <div className="mt-4 bg-violet-50 p-4 rounded-xl border border-violet-100">
-                                        <div className="flex justify-between items-center mb-2">
-                                            <h4 className="font-bold text-violet-800 flex items-center"><Brain className="w-4 h-4 mr-2"/> AI Audit</h4>
-                                            <Button size="sm" className="h-8 text-xs" onClick={()=>analyzeSurvey(viewModalData)} disabled={analysisLoading}>
-                                                {analysisLoading ? 'Checking...' : 'Check'}
+                                        <div className="flex justify-between items-center mb-3">
+                                            <h4 className="font-bold text-violet-800 flex items-center text-sm"><Brain className="w-4 h-4 mr-2"/> AI Analysis</h4>
+                                            <Button size="sm" className="h-7 text-xs px-2" onClick={()=>analyzeSurvey(viewModalData)} disabled={analysisLoading}>
+                                                {analysisLoading ? '...' : 'Check'}
                                             </Button>
                                         </div>
                                         {analysisData ? (
-                                            <div className="text-sm">
-                                                <div className={`font-bold text-${analysisData.color}-600 flex items-center gap-2`}>
+                                            <div className="text-sm animate-in fade-in">
+                                                <div className={`font-bold text-${analysisData.color}-600 flex items-center gap-2 mb-1`}>
                                                     <CheckCircle className="w-4 h-4"/> {analysisData.status} ({analysisData.score}%)
                                                 </div>
-                                                <p className="text-gray-600 mt-1 text-xs">{analysisData.reason}</p>
+                                                <p className="text-gray-600 text-xs leading-relaxed">{analysisData.reason}</p>
                                             </div>
                                         ) : (
-                                            <p className="text-xs text-gray-400 italic">Click check to verify authenticity.</p>
+                                            <p className="text-xs text-gray-400 italic">Verify authenticity of this survey using AI.</p>
                                         )}
                                     </div>
                                 </div>
 
-                                {/* Right: Data */}
+                                {/* Right Column: Details & Users */}
                                 <div className="lg:col-span-2 space-y-6">
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="p-3 bg-gray-50 rounded-lg"><label className="text-xs text-gray-500 uppercase">Name</label><p className="font-bold">{viewModalData.name}</p></div>
-                                        <div className="p-3 bg-gray-50 rounded-lg"><label className="text-xs text-gray-500 uppercase">Mobile</label><p className="font-bold">{viewModalData.mobile}</p></div>
-                                        <div className="p-3 bg-gray-50 rounded-lg"><label className="text-xs text-gray-500 uppercase">Zone</label><p className="font-bold">{viewModalData.zoneName}</p></div>
-                                        <div className="p-3 bg-gray-50 rounded-lg"><label className="text-xs text-gray-500 uppercase">Date</label><p className="font-bold">{viewModalData.date}</p></div>
-                                        <div className="col-span-2 p-3 bg-gray-50 rounded-lg"><label className="text-xs text-gray-500 uppercase">Location</label><p className="font-medium text-sm">{viewModalData.full_location}</p></div>
+                                    {/* 1. Meta Data Grid */}
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                        <div className="p-3 bg-gray-50 rounded-xl border border-gray-100"><label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Booth</label><p className="font-semibold text-gray-800 text-sm">{viewModalData.booth_id}</p></div>
+                                        <div className="p-3 bg-gray-50 rounded-xl border border-gray-100"><label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Zone</label><p className="font-semibold text-gray-800 text-sm truncate" title={viewModalData.zoneName}>{viewModalData.zoneName}</p></div>
+                                        <div className="p-3 bg-gray-50 rounded-xl border border-gray-100"><label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Date</label><p className="font-semibold text-gray-800 text-sm">{viewModalData.date}</p></div>
+                                        <div className="p-3 bg-gray-50 rounded-xl border border-gray-100"><label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Time</label><p className="font-semibold text-gray-800 text-sm">{viewModalData.originalDate.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</p></div>
+                                        <div className="col-span-2 md:col-span-4 p-3 bg-gray-50 rounded-xl border border-gray-100"><label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Location</label><p className="font-medium text-gray-700 text-sm flex items-center gap-1"><MapPin className="w-3 h-3 text-red-400"/> {viewModalData.full_location}</p></div>
                                     </div>
 
+                                    {/* 2. Surveyor & Coordinator Cards */}
                                     <div>
-                                        <h4 className="font-bold text-gray-800 mb-3 border-b pb-2">Survey Responses</h4>
+                                        <h4 className="font-bold text-gray-800 mb-3 flex items-center gap-2"><Users className="w-4 h-4 text-violet-500"/> Survey Team</h4>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {/* OT (Surveyor) Card */}
+                                            <div className="flex items-center p-3 rounded-xl border border-blue-100 bg-blue-50/50">
+                                                <div className="h-12 w-12 rounded-full bg-white border-2 border-white shadow-sm overflow-hidden flex-shrink-0">
+                                                    {viewModalData.otProfile ? (
+                                                        <img src={viewModalData.otProfile} className="w-full h-full object-cover" onError={(e)=>{e.target.onerror=null; e.target.src='https://ui-avatars.com/api/?name=OT&background=random'}}/>
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center bg-blue-100 text-blue-500"><User className="w-6 h-6"/></div>
+                                                    )}
+                                                </div>
+                                                <div className="ml-3 overflow-hidden">
+                                                    <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">Surveyor (OT)</p>
+                                                    <p className="font-bold text-gray-900 text-sm truncate">{viewModalData.otName}</p>
+                                                    <p className="text-xs text-gray-500 flex items-center gap-1"><Phone className="w-3 h-3"/> {viewModalData.otMobile}</p>
+                                                </div>
+                                            </div>
+
+                                            {/* ZC (Coordinator) Card */}
+                                            <div className="flex items-center p-3 rounded-xl border border-purple-100 bg-purple-50/50">
+                                                <div className="h-12 w-12 rounded-full bg-white border-2 border-white shadow-sm overflow-hidden flex-shrink-0">
+                                                    {viewModalData.zcProfile ? (
+                                                        <img src={viewModalData.zcProfile} className="w-full h-full object-cover" onError={(e)=>{e.target.onerror=null; e.target.src='https://ui-avatars.com/api/?name=ZC&background=random'}}/>
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center bg-purple-100 text-purple-500"><UserCheck className="w-6 h-6"/></div>
+                                                    )}
+                                                </div>
+                                                <div className="ml-3 overflow-hidden">
+                                                    <p className="text-[10px] font-bold text-purple-600 uppercase tracking-wider">Coordinator (ZC)</p>
+                                                    <p className="font-bold text-gray-900 text-sm truncate">{viewModalData.zcName}</p>
+                                                    <p className="text-xs text-gray-500 flex items-center gap-1"><Phone className="w-3 h-3"/> {viewModalData.zcMobile}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* 3. Q&A List */}
+                                    <div>
+                                        <h4 className="font-bold text-gray-800 mb-3 border-b pb-2 flex items-center justify-between">
+                                            <span>Survey Responses</span>
+                                            <span className="text-xs font-normal text-gray-400">{viewModalData.sur_data?.length || 0} Questions</span>
+                                        </h4>
                                         <div className="space-y-3">
                                             {viewModalData.sur_data?.map((q, i) => (
-                                                <div key={i} className="p-3 bg-white border border-gray-100 rounded-lg shadow-sm">
-                                                    <p className="text-xs font-bold text-violet-600 mb-1">{q.question}</p>
-                                                    <p className="text-sm text-gray-700">{q.answer}</p>
+                                                <div key={i} className="p-3 bg-white border border-gray-100 rounded-xl shadow-sm hover:shadow-md transition-shadow">
+                                                    <p className="text-xs font-bold text-violet-600 mb-1.5">{q.question}</p>
+                                                    <p className="text-sm text-gray-800 font-medium pl-2 border-l-2 border-gray-200">{q.answer}</p>
                                                 </div>
                                             ))}
+                                            {!viewModalData.sur_data?.length && <p className="text-gray-400 italic text-sm">No response data available.</p>}
                                         </div>
                                     </div>
                                 </div>
