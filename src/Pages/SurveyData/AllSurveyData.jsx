@@ -63,7 +63,7 @@ const getBase64ImageFromURL = (url) => {
 // 2. HELPER: ZONE-WISE PDF GENERATOR
 // ===================================================================================
 const generateZoneWisePDF = async (surveys, onProgress) => {
-  const RECORDS_PER_PDF = 100; 
+  const RECORDS_PER_PDF = 3333; 
   const MARGIN_X = 10;
   const COL_GAP = 5;
   const CARD_WIDTH = 90; 
