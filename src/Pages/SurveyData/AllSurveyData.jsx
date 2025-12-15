@@ -63,7 +63,7 @@ const getBase64ImageFromURL = (url) => {
 // 2. HELPER: ZONE-WISE PDF GENERATOR
 // ===================================================================================
 const generateZoneWisePDF = async (surveys, onProgress) => {
-  const RECORDS_PER_PDF = 3335; 
+  const RECORDS_PER_PDF = 100; 
   const MARGIN_X = 10;
   const COL_GAP = 5;
   const CARD_WIDTH = 90; 
@@ -189,12 +189,12 @@ const generateZoneWisePDF = async (surveys, onProgress) => {
     }
 
     const textX = xPos + imgSize + 6;
-    const lineSpacing = 5.5;
+    const lineSpacing = 4.5;
     let textY = yPos + 8;
 
     doc.setTextColor(0);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
+    doc.setFontSize(8);
     doc.text(`SURVEY ID: ${item.sur_id || 'N/A'}`, textX, textY);
     
     textY += lineSpacing;
@@ -202,20 +202,35 @@ const generateZoneWisePDF = async (surveys, onProgress) => {
     doc.text(item.name ? item.name.substring(0, 25) : "Unknown", textX, textY);
     
     textY += lineSpacing;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(50);
+    doc.text(`Mobile No: ${item.mobile || ''}`, textX, textY);
+
+     textY += lineSpacing;
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.setTextColor(50);
-    doc.text(`${item.mobile || ''} | ${item.date}`, textX, textY);
+    doc.text(`Date: ${item.date}`, textX, textY);
     
     textY += lineSpacing;
     doc.setFont("helvetica", "bold");
     doc.setTextColor(0);
     doc.text(`Booth: ${item.booth_id || 'N/A'}`, textX, textY);
-    
-    textY += lineSpacing;
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(60);
-    doc.text(thisZone.substring(0, 25), textX, textY); 
+
+ textY += lineSpacing;
+doc.setFont("helvetica", "bold");
+doc.setTextColor(60);
+
+const availableWidth = CARD_WIDTH - (imgSize + 6) - 3;
+const zoneLineHeight = 3.5; // Adjust this for tighter/looser line spacing
+const zoneLines = doc.splitTextToSize(thisZone, availableWidth);
+
+zoneLines.forEach((line, index) => {
+  if (index < 2) { // Limit to 2 lines to prevent card overflow
+    doc.text(line, textX, textY + (index * zoneLineHeight));
+  }
+});
 
     totalProcessed++;
     currentBatchCount++;
