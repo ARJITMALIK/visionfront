@@ -7,8 +7,9 @@ import { Input } from '@/components/ui/input';
 // Import Lucide icons
 import { Phone, Lock, Eye, EyeOff, ArrowRight, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-
+import { useAuth } from '../context/AuthContext';
 const LoginPage = () => {
+  const { login } = useAuth();
   const [formData, setFormData] = useState({
     mobileNumber: '',
     password: '',
@@ -45,7 +46,8 @@ const navigate = useNavigate();
       
       // Check credentials
       if (formData.mobileNumber === VALID_NUMBER && formData.password === VALID_PASSWORD) {
-        // Success - show success message
+        // Success - update auth status
+        login();
         setLoginSuccess(true);
         navigate('/dashboard');
         console.log('Login successful! Redirecting to dashboard...');
