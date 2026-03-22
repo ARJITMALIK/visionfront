@@ -1,14 +1,23 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   Menu, ChevronDown, User, LogOut, Bell, ChevronsLeft, ChevronsRight
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 const Header = ({ onMenuClick, isCollapsed, setCollapsed }) => {
+  const { logout } = useAuth();
+  const navigate = useNavigate();
   const [isDropdownOpen, setDropdownOpen] = useState(false);
   const [isNotificationOpen, setNotificationOpen] = useState(false);
   const dropdownRef = useRef(null);
   const notificationRef = useRef(null);
+
+  const handleLogout = (e) => {
+    e.preventDefault();
+    logout();
+    navigate('/login');
+  };
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -98,9 +107,9 @@ const Header = ({ onMenuClick, isCollapsed, setCollapsed }) => {
                           <div className="mt-2 h-2 w-2 rounded-full bg-blue-500 flex-shrink-0" />
                         )}
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900">{notif.title}</p>
-                          <p className="text-xs text-gray-600 mt-1">{notif.message}</p>
-                          <p className="text-xs text-gray-400 mt-1">{notif.time}</p>
+                           <p className="text-sm font-medium text-gray-900">{notif.title}</p>
+                           <p className="text-xs text-gray-600 mt-1">{notif.message}</p>
+                           <p className="text-xs text-gray-400 mt-1">{notif.time}</p>
                         </div>
                       </div>
                     </div>
@@ -146,13 +155,13 @@ const Header = ({ onMenuClick, isCollapsed, setCollapsed }) => {
 
                 {/* Logout */}
                 <div className="border-t border-gray-100 pt-2">
-                  <a 
-                    href="/login" 
-                    className="flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                  <button 
+                    onClick={handleLogout}
+                    className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
                   >
                     <LogOut className="h-4 w-4" />
                     Logout
-                  </a>
+                  </button>
                 </div>
               </div>
             )}

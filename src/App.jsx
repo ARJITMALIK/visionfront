@@ -37,63 +37,69 @@ import LiveMap from './Pages/Live/LiveMap';
 import BoothAssign from './Pages/Users/BoothAssign';
 import Master_report from './Pages/Dashboard/Master_report';
 
+import { AuthProvider } from './context/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
 
 const App = () => {
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* --- Public Routes (No Layout) --- */}
-        <Route path="/" element={<Navigate to="/login" />} /> {/* Redirect root to login */}
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          {/* --- Public Routes (No Layout) --- */}
+          <Route path="/" element={<Navigate to="/login" />} /> {/* Redirect root to login */}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
-        {/* --- Main App Routes (Wrapped in AppLayout) --- */}
-        <Route 
-          path="/*" 
-          element={
-            <AppLayout>
-              <Routes>
-                {/* Define all your layout-based pages here */}
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/teamtrack" element={<TeamTracking />} />
-                <Route path="/livemap" element={<LiveMap/>} />
-                <Route path="/allusers" element={<AllUsers />} />
-                <Route path="/assignbooth" element={<BoothAssign />} />
-                <Route path="/addemoji" element={<AddEmoji />} />
-                <Route path="/allemoji" element={<AllEmoji />} />
-                <Route path="/addelection" element={<AddElection />} />
-                <Route path="/allelection" element={<AllElections />} />
-                <Route path="/allsurveydata" element={<AllSurveyData />} />
-                <Route path="/addquestions" element={<AddQuestions />} />
-                <Route path="/allquestions" element={<AllQuestions />} />
-                <Route path="/addoption" element={<AddOption />} />
-                <Route path="/alloptions" element={<AllOptions />} />
-                <Route path="/addbooth" element={<AddZone />} />
-                <Route path="/allbooth" element={<AllZone />} />
-                
-                <Route path="/addparty" element={<AddParty />} />
-                <Route path="/allparty" element={<AllParty />} />
-                <Route path="/addcandidates" element={<AddCandidates />} />
-                <Route path="/allcandidates" element={<AllCandidates />} />
-                <Route path="/notification" element={<AddNotification />} />
-                <Route path="/add-vidhan" element={<AddDistricts />} />
-                <Route path="/all-vidhan" element={<AllDistricts />} />
-                <Route path="/addloksabha" element={<AddLoksabha />} />
-                <Route path="/allloksabha" element={<AllLoksabha />} />
-                <Route path="/master-report" element={<Master_report/>} />
+          {/* --- Main App Routes (Wrapped in AppLayout and ProtectedRoute) --- */}
+          <Route 
+            path="/*" 
+            element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <Routes>
+                    {/* Define all your layout-based pages here */}
+                    <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/teamtrack" element={<TeamTracking />} />
+                    <Route path="/livemap" element={<LiveMap/>} />
+                    <Route path="/allusers" element={<AllUsers />} />
+                    <Route path="/assignbooth" element={<BoothAssign />} />
+                    <Route path="/addemoji" element={<AddEmoji />} />
+                    <Route path="/allemoji" element={<AllEmoji />} />
+                    <Route path="/addelection" element={<AddElection />} />
+                    <Route path="/allelection" element={<AllElections />} />
+                    <Route path="/allsurveydata" element={<AllSurveyData />} />
+                    <Route path="/addquestions" element={<AddQuestions />} />
+                    <Route path="/allquestions" element={<AllQuestions />} />
+                    <Route path="/addoption" element={<AddOption />} />
+                    <Route path="/alloptions" element={<AllOptions />} />
+                    <Route path="/addbooth" element={<AddZone />} />
+                    <Route path="/allbooth" element={<AllZone />} />
+                    
+                    <Route path="/addparty" element={<AddParty />} />
+                    <Route path="/allparty" element={<AllParty />} />
+                    <Route path="/addcandidates" element={<AddCandidates />} />
+                    <Route path="/allcandidates" element={<AllCandidates />} />
+                    <Route path="/notification" element={<AddNotification />} />
+                    <Route path="/add-vidhan" element={<AddDistricts />} />
+                    <Route path="/all-vidhan" element={<AllDistricts />} />
+                    <Route path="/addloksabha" element={<AddLoksabha />} />
+                    <Route path="/allloksabha" element={<AllLoksabha />} />
+                    <Route path="/master-report" element={<Master_report/>} />
 
 
-                {/* IMPORTANT: Use the path that your Sidebar expects for active styling */}
-                <Route path="/settings/website" element={<WebsiteSettings />} />
+                    {/* IMPORTANT: Use the path that your Sidebar expects for active styling */}
+                    <Route path="/settings/website" element={<WebsiteSettings />} />
 
-                {/* A catch-all to redirect any unknown path within the app to the dashboard */}
-                <Route path="*" element={<Navigate to="/dashboard" />} />
-              </Routes>
-            </AppLayout>
-          } 
-        />
-      </Routes>
-    </BrowserRouter>
+                    {/* A catch-all to redirect any unknown path within the app to the dashboard */}
+                    <Route path="*" element={<Navigate to="/dashboard" />} />
+                  </Routes>
+                </AppLayout>
+              </ProtectedRoute>
+            } 
+          />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
 };
 
